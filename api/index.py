@@ -46,6 +46,7 @@ exams = [
     },
 ]
 
+exams = []
 
 @app.route("/api/exams", methods=["GET"])
 def get_exams():
