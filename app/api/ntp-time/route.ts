@@ -5,8 +5,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   try {
     const date = await new Promise<Date>((resolve, reject) => {
       ntpClient.getNetworkTime("ntp.aliyun.com", 123, (err, date) => {
-        if (err) {
-          reject(err);
+        if (err || !date) {
+          reject(new Error("NTP 时间同步失败"));
         } else {
           resolve(date);
         }
