@@ -1,17 +1,28 @@
 'use client';
 
-import Image from 'next/image'
-import Link from 'next/link'
+import Image from 'next/image';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 export default function Home() {
   const [currentTime, setCurrentTime] = useState('00:00:00');
   const [examInfo, setExamInfo] = useState('');
 
+  async function getNtpTime() {
+    try {
+      const response = await fetch('/api/ntp-time'); // 请求后端 API 获取 NTP 时间
+      const data = await response.json();
+      return new Date(data.timestamp); // 使用服务器返回的准确时间
+    } catch (error) {
+      console.error('获取 NTP 时间失败，使用本地时间', error);
+      return new Date(); // 失败则使用本地时间
+    }
+  }
+
   useEffect(() => {
     async function loadExams() {
       try {
-        const response = await fetch('/api/exams');
+        const response = await fetch('/pyapi/exams');
         const exams = await response.json();
         return exams;
       } catch (error) {
@@ -30,14 +41,15 @@ export default function Home() {
 
     async function updateTime() {
       const exams = await loadExams();
-      
+      let ntpTime = await getNtpTime(); // 获取 NTP 时间
+
       function refresh() {
-        const now = new Date();
-        setCurrentTime(now.toLocaleTimeString('zh-CN', { hour12: false }).padStart(8, '0'));
+        ntpTime = new Date(ntpTime.getTime() + 1000); // 模拟时钟流逝
+        setCurrentTime(ntpTime.toLocaleTimeString('zh-CN', { hour12: false }).padStart(8, '0'));
 
         const nextExam = exams.find((exam: any) => {
           const endTime = new Date(new Date(exam.start_at).getTime() + exam.duration_hour * 3600000);
-          return now < endTime;
+          return ntpTime < endTime;
         });
 
         if (!nextExam) {
@@ -47,24 +59,22 @@ export default function Home() {
 
         const startTime = new Date(nextExam.start_at).getTime();
         const endTime = startTime + nextExam.duration_hour * 3600000;
-        
-        if (now.getTime() < startTime) {
+
+        if (ntpTime.getTime() < startTime) {
           setExamInfo(
-            `${nextExam.name} | 考试未开始 | 剩余 ${formatTime(startTime - now.getTime())}`
+            `${nextExam.name} | 未开始 | 剩余 ${formatTime(startTime - ntpTime.getTime())}`
           );
-        } else if (now.getTime() >= startTime && now.getTime() < endTime) {
+        } else if (ntpTime.getTime() >= startTime && ntpTime.getTime() < endTime) {
           setExamInfo(
-            `${nextExam.name} | 考试进行中 | 剩余 ${formatTime(endTime - now.getTime())}`
+            `${nextExam.name} | 考试中 | 已过去 ${formatTime(ntpTime.getTime() - startTime)} | 剩余 ${formatTime(endTime - ntpTime.getTime())}`
           );
         }
-        
-        
       }
 
       refresh();
       setInterval(refresh, 1000);
     }
-    
+
     updateTime();
   }, []);
 
@@ -104,8 +114,8 @@ export default function Home() {
             after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] 
             before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 
             after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 before:lg:h-[360px]">
-          <p className="time-display text-9xl font-bold mb-5">{currentTime}</p>
-          <p className="info text-2xl">
+          <p className="time-display font-bold mb-5" style={{ fontSize: '18vw' }}>{currentTime}</p>
+          <p className="info" style={{ fontSize: '3vw' }}>
             {examInfo.split('|').map((text, index) => (
               <span key={index}>
                 {text}

@@ -48,12 +48,13 @@ exams = [
 
 exams = []
 
-@app.route("/api/exams", methods=["GET"])
+
+@app.route("/pyapi/exams", methods=["GET"])
 def get_exams():
     return jsonify(exams)
 
 
-@app.route("/api/set_exams", methods=["POST"])
+@app.route("/pyapi/set_exams", methods=["POST"])
 def set_exams():
     global exams
     if not request.is_json:
