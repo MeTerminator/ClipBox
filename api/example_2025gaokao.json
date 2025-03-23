@@ -1,0 +1,42 @@
+[
+    {
+        "name": "语文",
+        "start_at": "2025-06-07 09:00:00",
+        "duration_hour": 2.5
+    },
+    {
+        "name": "数学",
+        "start_at": "2025-06-07 15:00:00",
+        "duration_hour": 2
+    },
+    {
+        "name": "物理历史",
+        "start_at": "2025-06-08 09:00:00",
+        "duration_hour": 1.25
+    },
+    {
+        "name": "外语",
+        "start_at": "2025-06-08 15:00:00",
+        "duration_hour": 2
+    },
+    {
+        "name": "化学",
+        "start_at": "2025-06-09 08:30:00",
+        "duration_hour": 1.25
+    },
+    {
+        "name": "地理",
+        "start_at": "2025-06-09 11:00:00",
+        "duration_hour": 1.25
+    },
+    {
+        "name": "思想政治",
+        "start_at": "2025-06-09 14:30:00",
+        "duration_hour": 1.25
+    },
+    {
+        "name": "生物",
+        "start_at": "2025-06-09 17:00:00",
+        "duration_hour": 1.25
+    }
+]

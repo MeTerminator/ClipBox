@@ -1,62 +1,35 @@
 from flask import Flask, jsonify, request
+import json
+import redis
+import os
+
+# MeTerminator
+# Homepage: https://met6.top/
+# QQ: 3532095196
+
+# 如果你看到了这个，那么你已经成功的发现了更新考试信息的API
+# 太懒没做鉴权，欢迎通过 QQ 联系我，和我分享你的发现 (doge)
+# 你不会通过这个更新考试的 API 来乱搞的对吧 (doge)
+# 不，我是不会吧我的 Redis 连接地址写进代码里的 (doge)
+
+r = redis.Redis.from_url(os.getenv("REDIS_URL"))
 
 app = Flask(__name__)
-
-# 默认考试时间
-exams = [
-    {
-        "name": "语文",
-        "start_at": "2025-06-07 09:00:00",
-        "duration_hour": 2.5
-    },
-    {
-        "name": "数学",
-        "start_at": "2025-06-07 15:00:00",
-        "duration_hour": 2
-    },
-    {
-        "name": "物理历史",
-        "start_at": "2025-06-08 09:00:00",
-        "duration_hour": 1.25
-    },
-    {
-        "name": "外语",
-        "start_at": "2025-06-08 15:00:00",
-        "duration_hour": 2
-    },
-    {
-        "name": "化学",
-        "start_at": "2025-06-09 08:30:00",
-        "duration_hour": 1.25
-    },
-    {
-        "name": "地理",
-        "start_at": "2025-06-09 11:00:00",
-        "duration_hour": 1.25
-    },
-    {
-        "name": "思想政治",
-        "start_at": "2025-06-09 14:30:00",
-        "duration_hour": 1.25
-    },
-    {
-        "name": "生物",
-        "start_at": "2025-06-09 17:00:00",
-        "duration_hour": 1.25
-    },
-]
-
-exams = []
 
 
 @app.route("/api/exams", methods=["GET"])
 def get_exams():
+    global r
+    try:
+        exams = json.loads(r.get("exams"))
+    except:
+        exams = []
     return jsonify(exams)
 
 
 @app.route("/api/set_exams", methods=["POST"])
 def set_exams():
-    global exams
+    global r
     if not request.is_json:
         return jsonify({"error": "Invalid JSON"}), 400
 
@@ -69,6 +42,7 @@ def set_exams():
             return jsonify({"error": "Each exam must have name, start_at, and duration_hour"}), 400
 
     exams = data  # 更新考试信息
+    r.set("exams", json.dumps(exams))  # 更新redis中的考试信息
     return jsonify({"message": "Exams updated successfully"})
 
 
