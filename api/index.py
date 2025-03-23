@@ -49,12 +49,12 @@ exams = [
 exams = []
 
 
-@app.route("/pyapi/exams", methods=["GET"])
+@app.route("/api/exams", methods=["GET"])
 def get_exams():
     return jsonify(exams)
 
 
-@app.route("/pyapi/set_exams", methods=["POST"])
+@app.route("/api/set_exams", methods=["POST"])
 def set_exams():
     global exams
     if not request.is_json:
@@ -73,4 +73,4 @@ def set_exams():
 
 
 if __name__ == "__main__":
-    app.run(port=5328, debug=True)
+    app.run(port=5328, debug=False)

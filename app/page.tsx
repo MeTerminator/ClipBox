@@ -10,7 +10,7 @@ export default function Home() {
 
   async function getNtpTime() {
     try {
-      const response = await fetch('/api/ntp-time'); // 请求后端 API 获取 NTP 时间
+      const response = await fetch('/apistatic/ntp-time'); // 请求后端 API 获取 NTP 时间
       const data = await response.json();
       return new Date(data.timestamp); // 使用服务器返回的准确时间
     } catch (error) {
@@ -22,7 +22,7 @@ export default function Home() {
   useEffect(() => {
     async function loadExams() {
       try {
-        const response = await fetch('/pyapi/exams');
+        const response = await fetch('/api/exams');
         const exams = await response.json();
         return exams;
       } catch (error) {
