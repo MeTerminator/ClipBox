@@ -10,7 +10,7 @@ import os
 # 如果你看到了这个，那么你已经成功的发现了更新考试信息的API
 # 太懒没做鉴权，欢迎通过 QQ 联系我，和我分享你的发现 (doge)
 # 你不会通过这个更新考试的 API 来乱搞的对吧 (doge)
-# 不，我是不会吧我的 Redis 连接地址写进代码里的 (doge)
+# 不，我是不会把我的 Redis 凭据写进代码里的 (doge)
 
 r = redis.Redis.from_url(os.getenv("REDIS_URL"))
 
