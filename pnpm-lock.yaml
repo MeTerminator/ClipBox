@@ -38,9 +38,6 @@ importers:
       next:
         specifier: '>=14.2.15'
         version: 15.2.3(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
-      ntp-client:
-        specifier: ^0.5.3
-        version: 0.5.3
       postcss:
         specifier: '>=8.4.31'
         version: 8.4.31
@@ -56,10 +53,6 @@ importers:
       typescript:
         specifier: 5.0.4
         version: 5.0.4
-    devDependencies:
-      '@types/ntp-client':
-        specifier: ^0.5.0
-        version: 0.5.0
 
 packages:
 
@@ -335,9 +328,6 @@ packages:
 
   '@types/node@20.1.4':
     resolution: {integrity: sha512-At4pvmIOki8yuwLtd7BNHl3CiWNbtclUbNtScGx4OHfBd4/oWoJC8KRCIxXwkdndzhxOsPXihrsOoydxBjlE9Q==}
-
-  '@types/ntp-client@0.5.0':
-    resolution: {integrity: sha512-MDKMQwt294nE496gJH7eOZL1jgWchp/QGwI+QvUvEKW5Trj0iGjmmgyKx9u6J4eN6gfGQM7znwUBvp1tvejE5g==}
 
   '@types/prop-types@15.7.14':
     resolution: {integrity: sha512-gNMvNH49DJ7OJYv+KAKn0Xp45p8PLl6zo2YnvDIbTd4J6MER2BmWN49TG7n9LvkyihINxeKW8+3bfS2yDC9dzQ==}
@@ -1332,11 +1322,6 @@ packages:
     resolution: {integrity: sha512-bdok/XvKII3nUpklnV6P2hxtMNrCboOjAcyBuQnWEhO665FwrSNRxU+AqpsyvO6LgGYPspN+lu5CLtw4jPRKNA==}
     engines: {node: '>=0.10.0'}
 
-  ntp-client@0.5.3:
-    resolution: {integrity: sha512-/Ja8ljm8V0yb+zZnjEaJlFY3abA9gIpQcnkX8RJ59NzHVcnJJpGoKtU3UcrnAwRfduYAktI+2gJLpn1NepxgnA==}
-    engines: {node: '>= 0.10.0'}
-    hasBin: true
-
   object-assign@4.1.1:
     resolution: {integrity: sha512-rJgTQnkUnH1sFw8yT6VSU3zD3sWmu6sZhIseY8VX+GRu3P6F7Fu+JNDoXfklElbLJSnc3FUQHVe4cU5hj+BcUg==}
     engines: {node: '>=0.10.0'}
@@ -2117,8 +2102,6 @@ snapshots:
   '@types/json5@0.0.29': {}
 
   '@types/node@20.1.4': {}
-
-  '@types/ntp-client@0.5.0': {}
 
   '@types/prop-types@15.7.14': {}
 
@@ -3297,8 +3280,6 @@ snapshots:
   normalize-path@3.0.0: {}
 
   normalize-range@0.1.2: {}
-
-  ntp-client@0.5.3: {}
 
   object-assign@4.1.1: {}
 
