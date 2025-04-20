@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from pyapp.extensions import redis_client
+from app.extensions import redis_client
 import json
 
 exams_bp = Blueprint('exams', __name__)

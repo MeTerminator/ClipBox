@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, make_response
-from pyapp.extensions import redis_client
+from app.extensions import redis_client
 import json
 import requests
 import time
