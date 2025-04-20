@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MeT-Website</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="base.css">
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <meta name="robots" content="noindex, nofollow" />
+</head>
+
+<body>
+    <div class="container">
+
+        <div class="card">
+            <div class="wrapper">
+                <h1>Uptime Status</h1>
+
+                <div class="setting-card">
+                    <div class="left">
+                        <h3 class="text">MeT-Website 在线状态</h3>
+                        <a id="additional-info">更新中...</a>
+                    </div>
+                    <div class="right">
+                        <a id="status">未知</a>
+                    </div>
+
+                </div>
+
+                <p style="font-size: 15px; color: #666; text-align:center;">最后更新:
+                    <a id="last-updated">更新中...</a>
+                </p>
+            </div>
+        </div>
+
+        <div style="height: 15px;"></div>
+
+        <div class="card" id="test">
+            <div class="wrapper" style="text-align: center;">
+                
+
+                <div class="setting-card">
+                    <div class="left">
+                        <h3>MeT-Website</h3>
+                        <a href="https://met6.top/" target="_blank">https://met6.top/</a>
+                    </div>
+
+                    <div class="right">
+                        <a href="https://met6.top/" target="_blank" class="link">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"
+                                 style="vertical-align: middle;">
+                                <path
+                                        d="M320 0c-17.7 0-32 14.3-32 32s14.3 32 32 32h82.7L201.4 265.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L448 109.3V192c0 17.7 14.3 32 32 32s32-14.3 32-32V32c0-17.7-14.3-32-32-32H320zM80 32C35.8 32 0 67.8 0 112V432c0 44.2 35.8 80 80 80H400c44.2 0 80-35.8 80-80V320c0-17.7-14.3-32-32-32s-32 14.3-32 32V432c0 8.8-7.2 16-16 16H80c-8.8 0-16-7.2-16-16V112c0-8.8 7.2-16 16-16H192c17.7 0 32-14.3 32-32s-14.3-32-32-32H80z" />
+                            </svg>
+                            Open
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const statusElement = document.getElementById('status');
+        statusElement.classList.add('unknown');
+    </script>
+    <script src="get.js" defer></script>
+</body>
+
+</html>
