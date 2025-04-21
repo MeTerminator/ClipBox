@@ -11,11 +11,5 @@
       "src": "/(.*)",
       "dest": "api/index.py"
     }
-  ],
-  "crons": [
-    {
-      "path": "/api/uptime/details/",
-      "schedule": "* * * * *"
-    }
   ]
 }
