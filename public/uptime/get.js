@@ -27,7 +27,8 @@ async function update() {
             statusElement.classList.remove(last_status);
             statusElement.classList.add('unknown');
             // fetch data
-            fetch('/api/uptime/details/', { timeout: 10000 })
+            const timestamp = Date.now();
+            fetch(`/api/uptime/details/?t=${timestamp}`, { timeout: 10000 })
                 .then(response => response.json())
                 .then(async (data) => {
                     console.log(data);
@@ -77,3 +78,6 @@ async function update() {
 }
 
 update();
+
+
+
