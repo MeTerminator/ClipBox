@@ -4,7 +4,7 @@ WARNING: 不要使用格式化代码 (本文件内) / DON'T USE CODE FORMATTER H
 
 html {
     font-size: 25px;
-    overflow: auto; /* 添加此行 */
+    overflow: auto;
 }
 
 rt {
@@ -15,7 +15,7 @@ body, html {
     margin: 0;
     padding: 0;
     height: 100%;
-    overflow: auto; /* 添加此行 */
+    overflow: auto;
 }
 
 a {
@@ -29,6 +29,7 @@ p {
 
 h1, h2 {
     text-align: left;
+    color: #ffffff;
 }
 
 h1 {
@@ -43,34 +44,33 @@ h2 {
 }
 
 body {
-    /* 背景图设置 */
-    background: url('/statics/background.webp') no-repeat 25% center fixed;
+    background: url('background.webp') no-repeat 25% center fixed;
     background-size: cover;
     display: flex;
     justify-content: center;
     align-items: center;
-    background-color: #ddd;
+    background-color: #121212;
+    color: #ffffff;
 }
 
 hr {
     border: none;
     height: 2px;
-    background-color: rgba(0, 0, 0, 0.1);
+    background-color: rgba(255, 255, 255, 0.1);
     margin: 16px 0;
 }
 
 .card {
     padding: 44px 56px;
-    background-color: rgba(250, 250, 250, 0.85);
+    background-color: rgba(30, 30, 30, 0.85);
     border-radius: 8px;
-    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.1876);
+    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(60px);
-
     transition: all 0.15s;
 }
 
 .card:hover {
-    box-shadow: 0 32px 64px rgba(0, 0, 0, 0.28);
+    box-shadow: 0 32px 64px rgba(0, 0, 0, 0.7);
 }
 
 .card .wrapper {
@@ -85,15 +85,14 @@ hr {
     padding: 13px 15px;
     border-radius: 8px;
     justify-content: space-between;
-    background-color: rgba(255, 255, 255, 0.7);
-    border: 2px solid rgba(0, 0, 0, 0.08);
+    background-color: rgba(50, 50, 50, 0.7);
+    border: 2px solid rgba(255, 255, 255, 0.08);
     gap: 16px;
-
     transition: all 0.15s;
 }
 
 .setting-card:hover {
-    opacity: 0.88;
+    opacity: 0.95;
 }
 
 .setting-card .left {
@@ -106,10 +105,12 @@ hr {
 .setting-card h3 {
     font-weight: normal;
     font-size: 18px;
+    color: #ffffff;
 }
 
-.setting-card .left a, .setting-card .left p {
-    color: rgba(0, 0, 0, 0.6);
+.setting-card .left a,
+.setting-card .left p {
+    color: rgba(255, 255, 255, 0.7);
     font-size: 16px;
 }
 
@@ -123,7 +124,7 @@ hr {
 .link {
     padding: 5px 6px;
     font-weight: 500;
-    color: #005fb8;
+    color: #4da6ff;
     text-decoration: none;
     white-space: nowrap;
     font-size: 17px;
@@ -131,14 +132,13 @@ hr {
 }
 
 .link:hover {
-    background-color: rgba(0, 0, 0, 0.05);
+    background-color: rgba(255, 255, 255, 0.05);
 }
 
 .link svg {
-    fill: #005fb8;
+    fill: #4da6ff;
     width: 15px;
 }
-
 
 .container {
     display: flex;
@@ -155,7 +155,6 @@ hr {
 
 @media (max-width: 675px) {
     .container {
-        /*min-width: 600px;*/
         width: 90%;
     }
 
@@ -171,29 +170,29 @@ hr {
     }
 }
 
-/* 以下为各种状态的颜色 */
+/* 各种状态颜色（深色适配） */
 
 .unknown {
-    color: gray;
-    background-color: #f0f0f0;
+    color: #aaaaaa;
+    background-color: #2c2c2c;
 }
 
 .alive {
-    color: #0f7b0f;
-    background-color: #DFF6DD;
+    color: #7cfc00;
+    background-color: #1b2b1b;
 }
 
 .error {
-    color: #c42b1c;
-    background-color: #fde7e9;
+    color: #ff6b6b;
+    background-color: #3c1e1f;
 }
 
 .device-status-using {
-    color: #005fb8;
+    color: #4da6ff;
 }
 
 .device-status-unused {
-    color: gray;
+    color: #999999;
 }
 
 #device-status {
@@ -208,7 +207,6 @@ hr {
     font-size: 0.7em;
     padding: 4px 12px;
     border-radius: 8px;
-    border: 2px solid rgba(0, 0, 0, 0.06);
+    border: 2px solid rgba(255, 255, 255, 0.1);
     white-space: nowrap;
 }
-

@@ -1,0 +1,36 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #000000;
+    margin: 0;
+    padding: 0;
+}
+p {
+    color: #FFFFFF;
+    font-size: 30px;
+}
+.container {
+    max-width: 1280px;
+    margin: 0 auto;
+    text-align: center;
+    padding: 50px 20px;
+}
+h1 {
+    font-size: 48px;
+    margin-bottom: 40px;
+    color: #FFFFFF;
+}
+.payment-methods {
+    display: flex;
+    justify-content: center;
+    gap: 80px;
+    flex-wrap: wrap;
+}
+.payment {
+    text-align: center;
+}
+.payment img {
+    width: 300px;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+}
