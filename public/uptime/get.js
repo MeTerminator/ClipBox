@@ -11,7 +11,7 @@ function sliceText(text, maxLength) {
 }
 
 async function update() {
-    let refresh_time = 5000;
+    let refresh_time = 2000;
     let routerIndex = window.location.href.indexOf('?');
     let url = window.location.href.slice(0, routerIndex > 0 ? routerIndex : window.location.href.length);
     while (true) {
@@ -21,8 +21,8 @@ async function update() {
             let errorinfo = '';
             const statusElement = document.getElementById('status');
             // --- show updating
-            statusElement.textContent = '[更新中...]';
-            document.getElementById('additional-info').innerHTML = '正在更新状态...<br/>\n<a href="javascript:location.reload();" target="_self" style="color: rgb(0,149,255);">刷新页面</a>';
+            // statusElement.textContent = '[更新中...]';
+            // document.getElementById('additional-info').innerHTML = '正在更新状态...<br/>\n<a href="javascript:location.reload();" target="_self" style="color: rgb(0,149,255);">刷新页面</a>';
             last_status = statusElement.classList.item(0);
             statusElement.classList.remove(last_status);
             statusElement.classList.add('unknown');
