@@ -1,4 +1,4 @@
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory, redirect, request
 import os
 from .extensions import redis_client
 from .routes import register_blueprints
@@ -20,12 +20,16 @@ def create_app():
     def serve_index():
         return send_from_directory(public_dir, "index.html")
 
-    # 返回 public 目录下的其他静态文件；如果文件不存在，返回该目录下的 index.html（SPA 模式）
+    # 返回 public 目录下的其他静态文件或目录
     @app.route("/<path:path>", endpoint="static_files")
     def serve_static_file(path):
         full_path = os.path.join(public_dir, path)
 
-        # 如果是目录并且没有指定文件，返回该目录下的 index.html
+        # 如果是目录，但 URL 没有以 `/` 结尾，重定向到带 `/` 的 URL
+        if os.path.isdir(full_path) and not request.path.endswith('/'):
+            return redirect(request.path + '/')
+
+        # 如果是目录，返回 index.html
         if os.path.isdir(full_path):
             return send_from_directory(public_dir, os.path.join(path, "index.html"))
 
@@ -33,7 +37,11 @@ def create_app():
         if os.path.exists(full_path):
             return send_from_directory(public_dir, path)
 
-        # 如果文件不存在，返回该目录下的 index.html
-        return send_from_directory(public_dir, os.path.join(path, "index.html"))
+        # 如果文件不存在，尝试返回目录中的 index.html
+        if os.path.exists(os.path.join(public_dir, path, "index.html")):
+            return send_from_directory(public_dir, os.path.join(path, "index.html"))
+
+        # 最后兜底返回根目录 index.html（防止出错）
+        return send_from_directory(public_dir, "index.html")
 
     return app
