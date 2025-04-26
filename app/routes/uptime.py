@@ -87,7 +87,7 @@ def get_uptime_data():
             "last_updated": node_last_updated,
         }
 
-    uptime_data['last_stat_change'] = (overall_tags[0].split("Since ")[1].replace(" ago')", ""))
+    uptime_data['last_stat_change'] = (overall_tags[0].split("Since ")[1].replace(" ago')", "")).replace("')", "")
     uptime_data['last_updated'] = int(overall_tags[1].split(".attr('data-timez', '")[1].replace("')", ""))
     addup_latency = 0
     for node_id in uptime_data['nodes']:
