@@ -11,6 +11,7 @@ def get_exams():
     try:
         exams = json.loads(redis_client.get("EXAMS_DATA"))
     except:
+        redis_client.set("EXAMS_DATA", "[]")
         exams = []
     return jsonify(exams)
 

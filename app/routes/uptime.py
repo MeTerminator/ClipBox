@@ -96,20 +96,28 @@ def update_redis_periodically(interval=5):
         time.sleep(interval)
 
 
+def get_uptime_cache():
+    for i in range(5):
+        if last_updated == -1 or (time.time() - last_updated) > 60:
+            last_updated = time.time()
+            uptime_data = get_uptime_data()
+            redis_client.set("UPTIME_DATA", json.dumps(uptime_data))
+        else:
+            try:
+                uptime_data = json.loads(redis_client.get("UPTIME_DATA"))
+                return uptime_data
+            except:
+                uptime_data = {}
+                last_updated == -1
+    return uptime_data
+
+
 @uptime_bp.route("/details")
 def get_uptime_details():
     global redis_client
     global last_updated
-    if last_updated == -1 or (time.time() - last_updated) > 60:
-        last_updated = time.time()
-        uptime_data = get_uptime_data()
-        redis_client.set("UPTIME_DATA", json.dumps(uptime_data))
-    else:
-        try:
-            uptime_data = json.loads(redis_client.get("UPTIME_DATA"))
-        except:
-            uptime_data = {}
-    return jsonify(uptime_data)
+
+    return jsonify(get_uptime_cache())
 
 
 @uptime_bp.route("/")
@@ -117,15 +125,7 @@ def get_uptime():
     global redis_client
     global last_updated
 
-    if last_updated == -1 or (time.time() - last_updated) > 60:
-        last_updated = time.time()
-        uptime_data = get_uptime_data()
-        redis_client.set("UPTIME_DATA", json.dumps(uptime_data))
-    else:
-        try:
-            uptime_data = json.loads(redis_client.get("UPTIME_DATA"))
-        except:
-            uptime_data = {}
+    uptime_data = get_uptime_cache()
 
     response = make_response(jsonify({
         "status": uptime_data.get("status"),
