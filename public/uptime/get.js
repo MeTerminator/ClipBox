@@ -41,7 +41,7 @@ async function update() {
                         statusElement.classList.add('alive');
                     } else if (data.status == 'offline') {
                         statusElement.textContent = '离线';
-                        document.getElementById('additional-info').innerHTML = '离线+时间: ' + data.last_stat_change + '<br/>\n平均延迟: ' + data.average_response_time +'ms';
+                        document.getElementById('additional-info').innerHTML = '离线时间: ' + data.last_stat_change + '<br/>\n平均延迟: ' + data.average_response_time +'ms';
                         statusElement.classList.add('error');
                     } else {
                         statusElement.textContent = '未知';
