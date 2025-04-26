@@ -16,11 +16,13 @@ NODES_NAME = {
 
 last_updated = -1
 
+
 def split_list(data):
     last_two = data[-2:]
     remaining = data[:-2]
     groups = [remaining[i:i+3] for i in range(0, len(remaining), 3)]
     return groups, last_two
+
 
 def get_uptime_data():
     # Request uptime data
@@ -33,7 +35,6 @@ def get_uptime_data():
 
     data = {
         't': '77cd610a8bb67f98f485b02743f2c253',
-        'u': '1',
         'v': '1',
     }
 
@@ -83,6 +84,7 @@ def get_uptime_data():
 
     return uptime_data
 
+
 def update_redis_periodically(interval=5):
     global last_updated
     while True:
@@ -93,22 +95,37 @@ def update_redis_periodically(interval=5):
             redis_client.set("UPTIME_DATA", json.dumps(uptime_data))
         time.sleep(interval)
 
+
 @uptime_bp.route("/details")
 def get_uptime_details():
     global redis_client
-    try:
-        uptime_data = json.loads(redis_client.get("UPTIME_DATA"))
-    except:
-        uptime_data = {}
+    global last_updated
+    if last_updated == -1 or (time.time() - last_updated) > 60:
+        last_updated = time.time()
+        uptime_data = get_uptime_data()
+        redis_client.set("UPTIME_DATA", json.dumps(uptime_data))
+    else:
+        try:
+            uptime_data = json.loads(redis_client.get("UPTIME_DATA"))
+        except:
+            uptime_data = {}
     return jsonify(uptime_data)
+
 
 @uptime_bp.route("/")
 def get_uptime():
     global redis_client
-    try:
-        uptime_data = json.loads(redis_client.get("UPTIME_DATA"))
-    except:
-        uptime_data = {}
+    global last_updated
+
+    if last_updated == -1 or (time.time() - last_updated) > 60:
+        last_updated = time.time()
+        uptime_data = get_uptime_data()
+        redis_client.set("UPTIME_DATA", json.dumps(uptime_data))
+    else:
+        try:
+            uptime_data = json.loads(redis_client.get("UPTIME_DATA"))
+        except:
+            uptime_data = {}
 
     response = make_response(jsonify({
         "status": uptime_data.get("status"),
@@ -119,10 +136,7 @@ def get_uptime():
 
     return response
 
-# Start the periodic update thread when the application starts
+
 thread = threading.Thread(target=update_redis_periodically)
 thread.daemon = True
 thread.start()
-
-
-
