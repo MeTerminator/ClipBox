@@ -25,6 +25,16 @@ def split_list(data):
 
 
 def get_uptime_data():
+    uptime_data = {
+        "name": "MeT-Website",
+        "url": "https://met6.top/",
+        "status": "offline",
+        "last_updated": -1,
+        "last_stat_change": "",
+        "average_response_time": -1,
+        "nodes": {},
+    }
+
     # Request uptime data
     headers = {
         'Origin': 'https://uptime.met6.top',
@@ -35,21 +45,23 @@ def get_uptime_data():
 
     data = {
         't': '77cd610a8bb67f98f485b02743f2c253',
+        'u': '1',
         'v': '1',
     }
 
-    response = requests.post('https://uptime.met6.top/u_rb.php', headers=headers, data=data)
-    response_text = response.text
-    # Process uptime data
-    uptime_data = {
-        "name": "MeT-Website",
-        "url": "https://met6.top/",
-        "status": "offline",
-        "last_updated": -1,
-        "last_stat_change": "",
-        "average_response_time": -1,
-        "nodes": {},
-    }
+    for i in range(5):
+        response = requests.post('https://uptime.met6.top/u_rb.php', headers=headers, data=data)
+        response_text = response.text
+        # Process uptime data
+
+        if '<script>location.reload();</script>' in response_text:
+            if data['u'] == '1':
+                data['u'] = '0'
+            else:
+                data['u'] = '1'
+            continue
+
+        break
 
     response_text = response_text.replace('<script>if(!document.hidden){', '')
     response_text = response_text.replace('}</script>', '')
@@ -86,17 +98,25 @@ def get_uptime_data():
 
 
 def update_redis_periodically(interval=5):
+    global redis_client
     global last_updated
+
     while True:
-        current_time = time.time()
-        if last_updated == -1 or (current_time - last_updated) > interval:
-            last_updated = current_time
-            uptime_data = get_uptime_data()
-            redis_client.set("UPTIME_DATA", json.dumps(uptime_data))
+        try:
+            current_time = time.time()
+            if last_updated == -1 or (current_time - last_updated) > interval:
+                last_updated = current_time
+                uptime_data = get_uptime_data()
+                redis_client.set("UPTIME_DATA", json.dumps(uptime_data))
+        except:
+            pass
         time.sleep(interval)
 
 
 def get_uptime_cache():
+    global redis_client
+    global last_updated
+
     for i in range(5):
         if last_updated == -1 or (time.time() - last_updated) > 60:
             last_updated = time.time()
@@ -104,8 +124,13 @@ def get_uptime_cache():
             redis_client.set("UPTIME_DATA", json.dumps(uptime_data))
         else:
             try:
-                uptime_data = json.loads(redis_client.get("UPTIME_DATA"))
-                return uptime_data
+                redis_data = redis_client.get("UPTIME_DATA")
+                if redis_data is None:
+                    uptime_data = {}
+                    last_updated == -1
+                else:
+                    uptime_data = json.loads(redis_data)
+                    return uptime_data
             except:
                 uptime_data = {}
                 last_updated == -1
