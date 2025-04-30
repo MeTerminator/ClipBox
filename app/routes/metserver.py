@@ -5,7 +5,7 @@ import requests
 import time
 import threading
 
-uptime_bp = Blueprint('uptime', __name__)
+metserver_bp = Blueprint('metserver', __name__)
 
 NODES_NAME = {
     "k1": "New York",
@@ -137,12 +137,12 @@ def get_uptime_cache():
     return uptime_data
 
 
-@uptime_bp.route("/metwebsite")
-def get_uptime_details():
+@metserver_bp.route("/")
+def redirect_to_metwebsite():
     return redirect("https://met6.top/")
 
 
-@uptime_bp.route("/details")
+@metserver_bp.route("/uptime/details")
 def get_uptime_details():
     global redis_client
     global last_updated
@@ -150,7 +150,7 @@ def get_uptime_details():
     return jsonify(get_uptime_cache())
 
 
-@uptime_bp.route("/")
+@metserver_bp.route("/uptime/")
 def get_uptime():
     global redis_client
     global last_updated

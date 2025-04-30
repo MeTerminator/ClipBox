@@ -28,7 +28,7 @@ async function update() {
             statusElement.classList.add('unknown');
             // fetch data
             const timestamp = Date.now();
-            fetch(`/api/uptime/details/?t=${timestamp}`, { timeout: 10000 })
+            fetch(`/api/metserver/uptime/details/?t=${timestamp}`, { timeout: 10000 })
                 .then(response => response.json())
                 .then(async (data) => {
                     console.log(data);
