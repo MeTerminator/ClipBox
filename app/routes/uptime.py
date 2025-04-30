@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, make_response
+from flask import Blueprint, jsonify, make_response, redirect
 from app.extensions import redis_client
 import json
 import requests
@@ -135,6 +135,11 @@ def get_uptime_cache():
                 uptime_data = {}
                 last_updated == -1
     return uptime_data
+
+
+@uptime_bp.route("/metwebsite")
+def get_uptime_details():
+    return redirect("https://met6.top/")
 
 
 @uptime_bp.route("/details")
