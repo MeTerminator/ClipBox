@@ -126,7 +126,7 @@ def get_uptime_cache():
             try:
                 redis_data = redis_client.get("UPTIME_DATA")
                 if redis_data is None:
-                    uptime_data = {}
+                    uptime_data = get_uptime_data()
                     last_updated == -1
                 else:
                     uptime_data = json.loads(redis_data)
