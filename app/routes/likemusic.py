@@ -22,6 +22,14 @@ def get_likemusic_data():
     if data['status'] != "success":
         return []
     music_data = []
+    for music in data['data']:
+        music_data.append({
+            "mid": music['songmid'],
+            "name": music['title'],
+            "artist": music['author'],
+            "url": music['url'],
+            "cover": music['pic'],
+        })
     return music_data
 
 
