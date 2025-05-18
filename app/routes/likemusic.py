@@ -10,6 +10,12 @@ likemusic_bp = Blueprint('likemusic', __name__)
 last_updated = -1
 
 
+@likemusic_bp.after_request
+def add_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    return response
+
+
 def get_likemusic_data():
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 Edg/135.0.0.0 MeT-Box/1.0.0',
