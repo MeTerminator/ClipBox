@@ -62,7 +62,7 @@ def get_music_likes_cache():
             try:
                 redis_data = redis_client.get("LIKEMUSIC_DATA")
                 if redis_data is None:
-                    likemusic_data = []
+                    likemusic_data = get_likemusic_data()
                     last_updated == -1
                 else:
                     likemusic_data = json.loads(redis_data)
