@@ -44,7 +44,7 @@ h2 {
 }
 
 body {
-    background: url('background.webp') no-repeat 25% center fixed;
+    background: url('/background.webp') no-repeat 25% center fixed;
     background-size: cover;
     display: flex;
     justify-content: center;

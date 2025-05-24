@@ -1,0 +1,43 @@
+@import url('/css/colors.css');
+@import url('/css/button.css');
+@import url('/css/theme.css');
+@import url('/css/person-card.css');
+@import url('/css/custom.css');
+
+.aplayer-info {
+    height: 100px !important;
+}
+
+body {
+    font-family: 'Source Sans 3', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-image: url('background.webp');
+    background-position: center;
+    background-size: cover;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    z-index: -1;
+}
+
+.badges img {
+    display: inline-block;
+    height: 28px;
+}
+
+.gap {
+    padding-bottom: 1%;
+}
+
+@media (max-aspect-ratio: 1/1) {
+    body::before {
+        background-image: url('background.webp');
+    }
+}

@@ -1,0 +1,260 @@
+.card {
+    background-color: var(--card-background);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    padding: 1.5rem;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: var(--background-color);
+    line-height: 1.6;
+    font-size: 1.1em;
+    margin: 0;
+}
+
+.main {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+h2 {
+    color: var(--title-color);
+    margin: 0 0 1rem 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    border-bottom: 2px solid var(--m-color-40t);
+    padding-bottom: 0.5rem;
+}
+
+.container {
+    padding: 0 10px 0;
+    overflow-wrap: break-word;
+}
+
+.horizontal-align {
+    display: flex;
+    justify-content: left;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+p {
+    margin: 1rem 0;
+    color: #444;
+}
+
+ul {
+    padding-left: 28px;
+    margin: 1rem 0;
+}
+
+li {
+    margin: 0.2rem 0;
+    color: #555;
+}
+
+a {
+    color: var(--m-color);
+    text-decoration: none;
+    transition: opacity 0.2s;
+}
+
+a:hover {
+    opacity: 0.8;
+}
+
+.masked {
+    background-color: black;
+    color: transparent;
+    user-select: text;
+    transition: 0.3s;
+}
+
+.masked:hover {
+    color: white;
+}
+
+.nav-main {
+    padding-top: 1rem;
+    background: linear-gradient(to bottom,
+            rgba(51, 51, 51, 0.3) 0%,
+            rgba(51, 51, 51, 0) 100%);
+}
+
+.nav-container {
+    margin-left: 4%;
+    margin-right: 4%;
+    padding-left: 10px;
+    padding-right: 10px;
+    display: flex;
+    align-items: center;
+}
+
+.nav-links {
+    display: flex;
+    gap: 50px;
+    list-style: none;
+}
+
+.nav-links>li>a {
+    font-weight: 600;
+    font-size: 1rem;
+    user-select: none;
+    color: var(--nav-color);
+}
+
+.nav-menu-btn {
+    display: none;
+    position: fixed;
+    top: 12px;
+    right: 15px;
+    z-index: 1001;
+    background: rgba(51, 51, 51, 0.9);
+    border: none;
+    border-radius: 5px;
+    padding: 8px 12px;
+    color: white;
+    cursor: pointer;
+}
+
+html.darkmode {
+    & body::before {
+        filter: brightness(50%);
+    }
+
+    & .card,
+    .person-card {
+        background-color: var(--card-background-dark);
+    }
+
+    & button,
+    .person-card {
+        background: var(--background-color-dark);
+        border-color: #bbbbbbaa;
+    }
+
+    & .nav-links>li>a {
+        color: var(--nav-color-dark);
+    }
+
+    & body,
+    h2,
+    li,
+    button,
+    .person-card div>p {
+        color: #bbb;
+    }
+
+    & .nav-main {
+        background: none;
+    }
+
+    & .nav-menu-btn {
+        background: rgba(187, 187, 187, 0.9);
+        color: #333;
+    }
+
+    & button:hover {
+        border-color: var(--m-color);
+        background-color: var(--m-color-20t);
+    }
+}
+
+@media (max-width: 768px) {
+    .card {
+        padding: 1.2rem;
+    }
+
+    h2 {
+        font-size: 1.4rem;
+    }
+
+    .nav-links li:not(:first-child) {
+        display: none;
+    }
+
+    .nav-menu-btn {
+        display: block;
+    }
+
+    .nav-main.active {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100vh;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        z-index: 1000;
+    }
+
+    .nav-main.active .nav-links li:first-child {
+        display: none;
+    }
+
+    html.darkmode .nav-main.active {
+        background: rgba(0, 0, 0, 0.95);
+    }
+
+    .nav-main.active .nav-links {
+        flex-direction: column;
+        padding: 60px 20px 20px;
+        gap: 25px;
+    }
+
+    .nav-main.active .nav-links li {
+        display: block;
+        opacity: 0;
+        animation: slideIn 0.3s forwards;
+    }
+
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateX(-20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+}
+
+@media (max-width: 480px) {
+    .person-card div>img {
+        display: none;
+    }
+
+    .card {
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+    .main {
+        max-width: none;
+        padding: 0;
+        gap: 0;
+    }
+
+    body {
+        padding: 0px;
+    }
+
+    .nav-main {
+        background: var(--card-background);
+        border-bottom: 2px solid #00000022;
+    }
+
+    html.darkmode .nav-main {
+        border-bottom: 2px solid #ffffff22;
+        background-color: var(--card-background-dark);
+    }
+}

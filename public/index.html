@@ -1,41 +1,87 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Time | MeT-Box</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="description" content="MeT-Box">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MeT-Box</title>
+
+    <link href="/index.css" rel="stylesheet">
+    <script defer src="/index.js"></script>
+    <link rel="stylesheet" href="/aplayer/APlayer.min.css">
+
+    <script>
+        function openInNewTab(url) {
+            window.open(url, '_blank').focus();
+        }
+
+        function toggleTheme(mode = null) {
+            const isDarkMode = mode === null ? document.documentElement.classList.contains("darkmode") : mode;
+            if (isDarkMode) {
+                document.documentElement.classList.remove("darkmode");
+                localStorage.setItem("ui.darkmode", "false");
+            }
+            else {
+                document.documentElement.classList.add("darkmode");
+                localStorage.setItem("ui.darkmode", "true");
+            }
+        }
+
+        (() => {
+            const darkmode = localStorage.getItem("ui.darkmode") === "true";
+            toggleTheme(!darkmode);
+        })();
+    </script>
 </head>
-<body class="bg-white dark:bg-black text-black dark:text-white">
-  <main class="flex min-h-screen flex-col items-center justify-between p-24">
 
-    <div class="z-10 w-full max-w-5xl items-center justify-between font-mono text-sm lg:flex">
-      <p class="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 
-                 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 
-                 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto 
-                 lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-        <code class="font-mono font-bold">Time | MeT-Box</code>
-      </p>
-    </div>
+<body>
+    <header>
+        <button class="nav-menu-btn">☰ 菜单</button>
+        <nav class="nav-main">
+            <div class="nav-container">
+                <ul class="nav-links">
+                    <li><a href="https://met6.top/" target="_blank">MeT-Website</a></li>
+                    <li><a href="/metserver/" target="_blank">在线监测</a></li>
+                    <li><a href="/clip/" target="_blank">剪贴板</a></li>
+                    <li><a href="/sponsor/" target="_blank">赞助</a></li>
+                    <li><a onclick="toggleTheme()">深色模式</a></li>
+                </ul>
+            </div>
+        </nav>
+    </header>
+    <main class="main">
+        <section class="card">
+            <h2>MeT-Box</h2>
+            <div class="container horizontal-align">
+                <button onclick="openInNewTab('/time/')">Time 时钟 (考试版)</button>
+            </div>
+        </section>
 
-    <div class="relative flex flex-col items-center place-items-center 
-                before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 
-                before:rounded-full before:bg-gradient-radial before:from-white 
-                before:to-transparent before:blur-2xl before:content-[''] 
-                after:absolute after:-z-20 after:h-[180px] after:w-[240px] 
-                after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 
-                after:via-blue-200 after:blur-2xl after:content-[''] 
-                before:dark:bg-gradient-to-br before:dark:from-transparent 
-                before:dark:to-blue-700 before:dark:opacity-10 
-                after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 
-                before:lg:h-[360px]">
-      <p id="exam-info" class="text-center" style="font-size: 3vw;"></p>
-      <p id="time" class="font-bold mb-5" style="font-size: 18vw;">00:00:00</p>
-    </div>
+        <section class="card">
+            <h2>Music</h2>
+            <div class="container horizontal-align">
+                <div id="aplayer"></div>
+                <script src="/aplayer/APlayer.min.js"></script>
+                <script src="/aplayer/axios.min.js"></script>
+                <script src="/aplayer/likemusic.js"></script>
+                <script>
+                    aplayerInit();
+                </script>
+            </div>
+        </section>
 
-    <div class="mb-32 grid text-center lg:mb-0 lg:grid-cols-4 lg:text-left"></div>
-  </main>
+        <footer class="card">
+            <h2>About</h2>
+            <div class="container"
+                style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                <div>
+                    <button onclick="openInNewTab('https://met6.top/')">MeT-Website</button>
+                </div>
+            </div>
+        </footer>
+    </main>
 
-  <script src="exam_timer.js"></script>
 </body>
+
 </html>

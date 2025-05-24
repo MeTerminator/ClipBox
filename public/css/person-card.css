@@ -1,0 +1,37 @@
+.person-card {
+    background-color: rgb(248, 248, 248);
+    box-shadow: rgba(0, 0, 0, 0.1) 0px 4px 8px;
+    margin-bottom: 1.5%;
+    border-width: 1px;
+    border-style: solid;
+    border-color: rgb(229, 229, 229);
+    border-image: initial;
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.person-card div {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.person-card div > img {
+    width: 90px;
+    height: 90px;
+    object-fit: cover;
+    box-shadow: rgba(0, 0, 0, 0.1) 0px 2px 4px;
+    border-radius: 50%;
+    border-width: 2px;
+    border-style: solid;
+    border-color: rgb(255, 255, 255);
+    border-image: initial;
+}
+
+.person-card div > p {
+    font-size: 0.9em;
+    color: rgb(68, 68, 68);
+    line-height: 1.5;
+    font-weight: 400;
+    margin: 0px;
+}
