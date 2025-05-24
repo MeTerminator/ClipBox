@@ -104,7 +104,7 @@ def update_redis_periodically(interval=5):
     while True:
         try:
             current_time = time.time()
-            if last_updated == -1 or (current_time - last_updated) > interval:
+            if last_updated == -1 or (current_time - last_updated) > 60:
                 last_updated = current_time
                 uptime_data = get_uptime_data()
                 redis_client.set("UPTIME_DATA", json.dumps(uptime_data))

@@ -101,7 +101,7 @@ def get_clip(code):
 
     # 创建响应并设置Content-Type为UTF-8
     resp = make_response(content)
-    resp.headers["Content-Type"] = "text/plain; charset=utf-8"
+    resp.headers["Content-Type"] = meta.get("content_type", "text/plain; charset=utf-8")
     return resp
 
 

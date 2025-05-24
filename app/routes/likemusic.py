@@ -39,14 +39,14 @@ def get_likemusic_data():
     return music_data
 
 
-def update_redis_periodically(interval=2*60*60):
+def update_redis_periodically(interval=1):
     global redis_client
     global last_updated
 
     while True:
         try:
             current_time = time.time()
-            if last_updated == -1 or (current_time - last_updated) > interval:
+            if last_updated == -1 or (current_time - last_updated) > 2*60*60:
                 last_updated = current_time
                 likemusic_data = get_likemusic_data()
                 redis_client.set("LIKEMUSIC_DATA", json.dumps(likemusic_data))
