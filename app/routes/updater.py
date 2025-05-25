@@ -11,7 +11,7 @@ default_config = {
 }
 
 
-@updater_bp.route("/")
+@updater_bp.route("/", methods=["GET", "POST"])
 def get_updater_config():
     global redis_client
     try:
