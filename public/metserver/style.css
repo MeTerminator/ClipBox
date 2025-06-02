@@ -89,6 +89,7 @@ hr {
     border: 2px solid rgba(255, 255, 255, 0.08);
     gap: 16px;
     transition: all 0.15s;
+    margin-bottom: 10px;
 }
 
 .setting-card:hover {

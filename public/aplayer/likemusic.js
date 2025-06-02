@@ -1,5 +1,5 @@
 function aplayerInit(fixed = false, mini = false) {
-    axios.get('/api/likemusic/')
+    axios.get('/api/mets/likemusic/')
         .then(response => {
             const rawList = response.data;
             // 构造 APlayer 所需的 audios 列表
