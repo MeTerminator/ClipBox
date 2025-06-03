@@ -41,10 +41,7 @@
         <nav class="nav-main">
             <div class="nav-container">
                 <ul class="nav-links">
-                    <li><a href="https://met6.top/" target="_blank">MeT-Website</a></li>
-                    <li><a href="/metserver/" target="_blank">在线监测</a></li>
-                    <li><a href="/clip/" target="_blank">剪贴板</a></li>
-                    <li><a href="/sponsor/" target="_blank">赞助</a></li>
+                    <li><a href="/" target="_blank">主页</a></li>
                     <li><a onclick="toggleTheme()">深色模式</a></li>
                 </ul>
             </div>
@@ -54,7 +51,10 @@
         <section class="card">
             <h2>MeT-Box</h2>
             <div class="container horizontal-align">
-                <button onclick="openInNewTab('/time/')">Time 时钟 (考试版)</button>
+                <button onclick="openInNewTab('/clip/')">剪贴板</button>
+                <button onclick="openInNewTab('/likemusic/')">音乐</button>
+                <button onclick="openInNewTab('/sponsor/')">赞助</button>
+                <button onclick="openInNewTab('/time/')">时钟</button>
             </div>
         </section>
 
@@ -71,16 +71,23 @@
             </div>
         </section>
 
+        <section class="card">
+            <h2>MeT-Server</h2>
+            <div class="container horizontal-align">
+                <button onclick="openInNewTab('https://met6.top/')">MeT-Website</button>
+                <button onclick="openInNewTab('/metserver/')">MeT-Server 在线监控</button>
+            </div>
+        </section>
+
         <footer class="card">
             <h2>About</h2>
-            <div class="container"
-                style="text-align: center;">
+            <div class="container" style="text-align: center;">
                 <div>
                     <span>MeTerminator</span>
                     <br>
                     <span>QQ: 3532095196</span>
                     <br>
-                    <button onclick="openInNewTab('https://met6.top/')">MeT-Website</button>
+                    <a href="https://github.com/MeTerminator/met-box" target="_blank">GitHub</a>
                 </div>
             </div>
         </footer>
