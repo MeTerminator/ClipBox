@@ -36,6 +36,18 @@ body::before {
     padding-bottom: 1%;
 }
 
+.sponsor {
+    background-color: rgba(255, 255, 255, 0.6);
+    padding: 10px;
+}
+
+.sponsor img {
+    width: 100%;
+    height: auto;
+    display: block;
+    object-fit: contain;
+}
+
 @media (max-aspect-ratio: 1/1) {
     body::before {
         background-image: url('background.webp');

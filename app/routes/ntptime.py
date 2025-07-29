@@ -17,6 +17,5 @@ ntptime_bp = Blueprint('ntptime', __name__)
 
 
 @ntptime_bp.route("/")
-def get_exams():
-
+def _():
     return jsonify({"timestamp": get_ntp_time()})

@@ -33,7 +33,7 @@ document.getElementById("createClipForm").addEventListener("submit", function (e
             if (data.code) {
                 const codeUrl = "/api/clip/get/" + data.code;
                 document.getElementById("result").innerHTML =
-                    `✅ 创建成功：<a href="${codeUrl}" target="_blank">${data.code}</a>`;
+                    `✅ 创建成功：<a href="${codeUrl}" target="_blank" style="color: white; font-weight: bold;">${data.code}</a>`;
                 addToHistory(data.code);
             } else {
                 document.getElementById("result").innerText = "❌ 错误: " + data.error;

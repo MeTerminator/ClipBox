@@ -1,7 +1,7 @@
 from flask import redirect, Blueprint, request, jsonify, make_response
 from app.extensions import redis_client
 import json
-import uuid
+import random
 import time
 import threading
 import re
@@ -38,7 +38,7 @@ def create_clip():
 
     content_type = "link" if is_link else "text/plain"
 
-    code = str(uuid.uuid4())[:8]
+    code = str(random.randint(1000, 9999))
     created_at = int(time.time())
 
     content_key = f"CLIP_DATA_{code}"

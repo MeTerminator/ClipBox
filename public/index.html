@@ -9,30 +9,6 @@
 
     <link href="/index.css" rel="stylesheet">
     <script defer src="/index.js"></script>
-    <link rel="stylesheet" href="/aplayer/APlayer.min.css">
-
-    <script>
-        function openInNewTab(url) {
-            window.open(url, '_blank').focus();
-        }
-
-        function toggleTheme(mode = null) {
-            const isDarkMode = mode === null ? document.documentElement.classList.contains("darkmode") : mode;
-            if (isDarkMode) {
-                document.documentElement.classList.remove("darkmode");
-                localStorage.setItem("ui.darkmode", "false");
-            }
-            else {
-                document.documentElement.classList.add("darkmode");
-                localStorage.setItem("ui.darkmode", "true");
-            }
-        }
-
-        (() => {
-            const darkmode = localStorage.getItem("ui.darkmode") === "true";
-            toggleTheme(!darkmode);
-        })();
-    </script>
 </head>
 
 <body>
@@ -47,38 +23,55 @@
             </div>
         </nav>
     </header>
+
     <main class="main">
+        <!-- 原首页功能卡片 -->
         <section class="card">
-            <h2>MeT-Box</h2>
-            <div class="container horizontal-align">
-                <button onclick="openInNewTab('/clip/')">剪贴板</button>
-                <button onclick="openInNewTab('/likemusic/')">音乐</button>
-                <button onclick="openInNewTab('/sponsor/')">赞助</button>
-                <button onclick="openInNewTab('/time/')">时钟</button>
+            <h2>ClipBoard</h2>
+            <div class="container" style="text-align: center;">
+                <!-- 4位数输入框 -->
+                <div style="margin-top: 1rem;">
+                    <input id="clipCodeInput" type="text" maxlength="4" placeholder="提取码"
+                        style="padding: 0.5rem; font-size: 1rem; width: 15rem; text-align: center;"
+                        oninput="handleClipCodeInput(this.value)"
+                        onkeydown="if(event.key === 'Enter') extractClipCode()">
+                </div>
+
+                <!-- 提取按钮 -->
+                <div id="extractButtonWrapper" style="margin-top: 1rem; display: none;">
+                    <button id="extractBtn" onclick="extractClipCode()" style="padding: 0.5rem 1rem;">提取</button>
+                </div>
+
+                <br>
+                <button onclick="openInNewTab('/clip/')">创建剪贴板</button>
+            </div>
+
+        </section>
+
+
+
+        <!-- 时间卡片 -->
+        <section class="card">
+            <h2>Time</h2>
+            <div class="container" style="text-align: center;">
+                <span id="currentTime" style="font-size: 3rem; font-weight: 600;"></span>
+                <br>
+                <button onclick="openInNewTab('/time.html')">时钟</button>
             </div>
         </section>
 
+
+        <!-- 赞助卡片 -->
         <section class="card">
-            <h2>Music</h2>
-            <div class="container horizontal-align">
-                <div id="aplayer"></div>
-                <script src="/aplayer/APlayer.min.js"></script>
-                <script src="/aplayer/axios.min.js"></script>
-                <script src="/aplayer/likemusic.js"></script>
-                <script>
-                    aplayerInit();
-                </script>
+            <h2>Sponsor</h2>
+            <div class="container">
+                <div class="sponsor">
+                    <img src="sponsor.png" alt="sponsor">
+                </div>
             </div>
         </section>
 
-        <section class="card">
-            <h2>MeT-Server</h2>
-            <div class="container horizontal-align">
-                <button onclick="openInNewTab('https://met6.top/')">MeT-Website</button>
-                <button onclick="openInNewTab('/metserver/')">MeT-Server 在线监控</button>
-            </div>
-        </section>
-
+        <!-- 页脚 -->
         <footer class="card">
             <h2>About</h2>
             <div class="container" style="text-align: center;">
@@ -88,11 +81,12 @@
                     <span>QQ: 3532095196</span>
                     <br>
                     <a href="https://github.com/MeTerminator/met-box" target="_blank">GitHub</a>
+                    <br>
+                    <button onclick="openInNewTab('https://met6.top/')">MeT-Website</button>
                 </div>
             </div>
         </footer>
     </main>
-
 </body>
 
 </html>

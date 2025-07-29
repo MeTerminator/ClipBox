@@ -118,25 +118,36 @@ function toggleTheme(mode = null) {
     navMain.addEventListener('click', (e) => {
         e.stopPropagation();
     });
-
-    // 自动根据浏览器设置应用主题
-    const userPref = localStorage.getItem("ui.darkmode");
-    let darkmode;
-
-    if (userPref === null) {
-        // 用户没有手动设置过，跟随系统
-        darkmode = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    } else {
-        darkmode = userPref === "true";
-    }
-
-    toggleTheme(darkmode);
-
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-        const userPref = localStorage.getItem("ui.darkmode");
-        if (userPref === null) {
-            toggleTheme(e.matches);
-        }
-    });
-
 })();
+
+/* ====== 当前时间卡片的逻辑 ====== */
+function updateTime() {
+    const now = new Date();
+    const str = now.toLocaleTimeString('zh-CN', { hour12: false });
+    const el = document.getElementById('currentTime');
+    if (el) el.textContent = str;
+}
+/* 等页面加载完再启动计时器，避免找不到元素 */
+window.addEventListener('DOMContentLoaded', () => {
+    updateTime();
+    setInterval(updateTime, 1000); // 每秒刷新一次
+});
+function handleClipCodeInput(value) {
+    const cleaned = value.replace(/\D/g, ''); // 只保留数字
+    const input = document.getElementById('clipCodeInput');
+    input.value = cleaned.slice(0, 4); // 限制为最多4位
+
+    const extractBtnWrapper = document.getElementById('extractButtonWrapper');
+    if (cleaned.length === 4) {
+        extractBtnWrapper.style.display = 'block';
+    } else {
+        extractBtnWrapper.style.display = 'none';
+    }
+}
+
+function extractClipCode() {
+    const code = document.getElementById('clipCodeInput').value;
+    if (/^\d{4}$/.test(code)) {
+        window.location.href = `/api/clip/get/${code}`;
+    }
+}

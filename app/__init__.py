@@ -17,12 +17,12 @@ def create_app():
 
     # 返回首页 index.html
     @app.route("/", endpoint="index")
-    def serve_index():
+    def _():
         return send_from_directory(public_dir, "index.html")
 
     # 返回 public 目录下的其他静态文件或目录
     @app.route("/<path:path>", endpoint="static_files")
-    def serve_static_file(path):
+    def _(path):
         full_path = os.path.join(public_dir, path)
 
         # 如果是目录，但 URL 没有以 `/` 结尾，重定向到带 `/` 的 URL
