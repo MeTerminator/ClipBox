@@ -7,8 +7,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MeT-Box</title>
 
-    <link href="/index.css" rel="stylesheet">
-    <script defer src="/index.js"></script>
+    <link href="/css/index.css" rel="stylesheet">
+    <script defer src="/js/index.js"></script>
+    <script src="/js/decrypt.js"></script>
+    <script src="/js/zip.js"></script>
 </head>
 
 <body>
@@ -25,13 +27,14 @@
     </header>
 
     <main class="main">
-        <!-- 原首页功能卡片 -->
+        <!-- 剪贴板卡片 -->
         <section class="card">
             <h2>ClipBoard</h2>
             <div class="container" style="text-align: center;">
                 <!-- 4位数输入框 -->
                 <div style="margin-top: 1rem;">
                     <input id="clipCodeInput" type="text" maxlength="4" placeholder="提取码"
+                        class="file-input"
                         style="padding: 0.5rem; font-size: 1rem; width: 15rem; text-align: center;"
                         oninput="handleClipCodeInput(this.value)"
                         onkeydown="if(event.key === 'Enter') extractClipCode()">
@@ -45,10 +48,24 @@
                 <br>
                 <button onclick="openInNewTab('/clip/')">创建剪贴板</button>
             </div>
-
         </section>
 
-
+        <!-- 文件分享区 -->
+        <section class="card">
+            <h2>FireShare</h2>
+            <div class="container">
+                <ul>
+                    <li><a href="/api/fileshare/clash/exe" target="_blank">Clash.Verge_x64-setup.exe</a></li>
+                    <li><a href="/api/fileshare/clash/apk" target="_blank">cmfa-meta-arm64-v8a-release.apk</a></li>
+                </ul>
+            </div>
+            <div class="container" style="text-align: center; margin-top: 1.5rem;">
+                <span>上方链接下载的 ShareXXX.zip 在下方进行解密，即可得到原始文件。</span>
+                <br>
+                <input type="file" id="zipInput" class="file-input">
+                <button onclick="decryptZip()">解密</button>
+            </div>
+        </section>
 
         <!-- 时间卡片 -->
         <section class="card">
@@ -56,7 +73,7 @@
             <div class="container" style="text-align: center;">
                 <span id="currentTime" style="font-size: 3rem; font-weight: 600;"></span>
                 <br>
-                <button onclick="openInNewTab('/time.html')">时钟</button>
+                <button onclick="openInNewTab('/time/')">时钟</button>
             </div>
         </section>
 
@@ -66,7 +83,7 @@
             <h2>Sponsor</h2>
             <div class="container">
                 <div class="sponsor">
-                    <img src="sponsor.png" alt="sponsor">
+                    <img src="/img/sponsor.png" alt="sponsor">
                 </div>
             </div>
         </section>

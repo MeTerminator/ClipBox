@@ -19,7 +19,7 @@ body::before {
     left: 0;
     width: 100vw;
     height: 100vh;
-    background-image: url('background.webp');
+    background-image: url('/img/background.webp');
     background-position: center;
     background-size: cover;
     background-attachment: fixed;
@@ -48,8 +48,23 @@ body::before {
     object-fit: contain;
 }
 
+.file-input {
+    display: inline-block;
+    padding: 0.5rem;
+    border: 2px solid #ccc;
+    border-radius: 6px;
+    font-size: 1rem;
+    background-color: #f9f9f9;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.file-input:hover {
+    border-color: #888;
+}
+
 @media (max-aspect-ratio: 1/1) {
     body::before {
-        background-image: url('background.webp');
+        background-image: url('/img/background.webp');
     }
 }
