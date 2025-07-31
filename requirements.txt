@@ -2,3 +2,4 @@ flask
 flask-redis
 ntplib
 requests
+validators

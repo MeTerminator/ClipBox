@@ -148,6 +148,7 @@ function handleClipCodeInput(value) {
 function extractClipCode() {
     const code = document.getElementById('clipCodeInput').value;
     if (/^\d{4}$/.test(code)) {
-        window.location.href = `/api/clip/get/${code}`;
+        // window.location.href = `/api/clip/get/${code}`;
+        openInNewTab(`/api/clip/get/${code}`);
     }
 }

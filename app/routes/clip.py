@@ -4,19 +4,9 @@ import json
 import random
 import time
 import threading
-import re
+import validators
 
 clip_bp = Blueprint('clip', __name__)
-
-
-URL_REGEX = re.compile(
-    r'^(https?://)'
-    r'((([A-Za-z0-9-]+\.)+[A-Za-z]{2,})|'  # 域名
-    r'localhost|'                         # 本地地址
-    r'(\d{1,3}\.){3}\d{1,3})'             # 或者 IP 地址
-    r'(:\d+)?'                            # 可选端口
-    r'(/[\w\-./?%&=]*)?$'                 # 路径
-)
 
 
 @clip_bp.route("/create", methods=["POST"])
@@ -33,7 +23,7 @@ def create_clip():
     if not content:
         return jsonify({"error": "Missing content"}), 400
 
-    if is_link and not URL_REGEX.match(content):
+    if is_link and not validators.url(content):
         return jsonify({"error": "Content must be a valid URL when link=yes"}), 400
 
     content_type = "link" if is_link else "text/plain"
