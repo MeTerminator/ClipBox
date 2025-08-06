@@ -1,5 +1,6 @@
 flask
 flask-redis
+flask_cors
 ntplib
 requests
 validators

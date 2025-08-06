@@ -1,4 +1,5 @@
 from flask import Flask, send_from_directory, redirect, request
+from flask_cors import CORS
 import os
 from .extensions import redis_client
 from .routes import register_blueprints
@@ -9,6 +10,8 @@ def create_app():
     app.config.from_object('app.config.Config')
     app.json.sort_keys = False
     app.url_map.strict_slashes = False
+
+    CORS(app)
 
     redis_client.init_app(app)
     register_blueprints(app)
