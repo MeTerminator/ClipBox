@@ -1,6 +1,10 @@
 flask
-flask-redis
+flask-sqlalchemy
+pymysql
 flask_cors
 ntplib
 requests
 validators
+werkzeug
+redis
+cryptography

@@ -1,8 +1,8 @@
-from flask import Flask, send_from_directory, redirect, request
+from flask import Flask, send_from_directory, request
 from flask_cors import CORS
+from app.routes import register_blueprints
+from app.database import db, init_database
 import os
-from .extensions import redis_client
-from .routes import register_blueprints
 
 
 def create_app():
@@ -13,38 +13,53 @@ def create_app():
 
     CORS(app)
 
-    redis_client.init_app(app)
+    # 初始化数据库
+    db.init_app(app)
+
+    # 创建数据库表
+    init_database(app)
+
+    # 注册蓝图
     register_blueprints(app)
 
-    public_dir = os.path.join(os.path.dirname(__file__), "../public")
+    # 静态资源根目录（使用绝对路径，避免工作目录差异导致 404）
+    project_root = os.path.dirname(os.path.dirname(__file__))
+    www_root = os.path.join(project_root, 'www')
 
-    # 返回首页 index.html
-    @app.route("/", endpoint="index")
-    def _():
-        return send_from_directory(public_dir, "index.html")
+    # 显式根路由，直接返回首页
+    @app.route('/')
+    def _index_page():
+        try:
+            return send_from_directory(www_root, 'index.html')
+        except Exception:
+            # 若首页不存在，返回 404
+            return ("index.html not found", 404)
 
-    # 返回 public 目录下的其他静态文件或目录
-    @app.route("/<path:path>", endpoint="static_files")
-    def _(path):
-        full_path = os.path.join(public_dir, path)
+    # 静态资源回退：当未命中任何蓝图（返回 404）时，尝试从 www/ 目录返回静态文件
+    @app.errorhandler(404)
+    def _serve_www_on_404(e):
+        # 对 /api/* 保持 API 语义，直接返回原始 404
+        req_path = request.path.lstrip('/')
+        if req_path.startswith('api/'):
+            return e
 
-        # 如果是目录，但 URL 没有以 `/` 结尾，重定向到带 `/` 的 URL
-        if os.path.isdir(full_path) and not request.path.endswith('/'):
-            return redirect(request.path + '/')
+        # 1) 根目录与精确文件命中
+        try:
+            return send_from_directory(www_root, req_path if req_path else 'index.html')
+        except Exception:
+            pass
 
-        # 如果是目录，返回 index.html
-        if os.path.isdir(full_path):
-            return send_from_directory(public_dir, os.path.join(path, "index.html"))
+        # 2) 目录命中 index.html（支持 /dir 与 /dir/ 两种形式）
+        if req_path:
+            try:
+                return send_from_directory(www_root, req_path.rstrip('/') + '/index.html')
+            except Exception:
+                pass
 
-        # 如果是文件并且存在，返回文件
-        if os.path.exists(full_path):
-            return send_from_directory(public_dir, path)
-
-        # 如果文件不存在，尝试返回目录中的 index.html
-        if os.path.exists(os.path.join(public_dir, path, "index.html")):
-            return send_from_directory(public_dir, os.path.join(path, "index.html"))
-
-        # 最后兜底返回根目录 index.html（防止出错）
-        return send_from_directory(public_dir, "index.html")
+        # 3) 根目录兜底 index.html
+        try:
+            return send_from_directory(www_root, 'index.html')
+        except Exception:
+            return e
 
     return app

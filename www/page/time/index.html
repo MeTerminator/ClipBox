@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Time | MeT-Box</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="main">
+
+    <!-- 顶部标题和按钮 -->
+    <div class="top">
+      <p class="banner">
+        <span class="banner-inner">
+          <code>
+            Time
+            <span class="spacer">|</span>
+            <a href="/" rel="noopener">主页</a>
+            <span class="spacer">|</span>
+            <a href="#" onclick="handleExamClip()">自定义考试</a>
+            <span class="spacer">|</span>
+            <a href="/page/time/doc.html" target="_blank" rel="noopener">文档</a>
+          </code>
+        </span>
+      </p>
+    </div>
+
+    <!-- 时间与考试信息展示 -->
+    <div class="stage">
+      <p id="exam-info"></p>
+      <p id="time">00:00:00</p>
+    </div>
+
+    <!-- 剪贴板请求结果 -->
+    <div id="clip-result"></div>
+
+  </main>
+
+  <!-- JS 逻辑 -->
+  <script src="time.js"></script>
+</body>
+</html>

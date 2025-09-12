@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Clip 剪贴板 | MeT-Box</title>
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="clip.css">
+</head>
+
+<body>
+    <button id="themeToggle" class="theme-toggle" aria-label="切换主题">🌙</button>
+    <div class="page-header">
+        <h1>📦 Clip 剪贴板</h1>
+        <p class="subtitle">轻松在多端间传文本、链接和文件</p>
+        <h4><a href="/">返回主页</a></h4>
+    </div>
+    <div class="tab-container">
+        <div class="tabs">
+            <button class="tab-button active" data-tab="file">文件上传</button>
+            <button class="tab-button" data-tab="text">文本剪贴板</button>
+            <button class="tab-button" data-tab="link">短链接</button>
+            
+        </div>
+        
+        <div id="file-tab" class="tab-content active">
+            <form id="uploadFileForm" action="/api/clip/upload" method="POST" enctype="multipart/form-data">
+                <label for="file">选择文件</label>
+                <div class="dropzone" id="dropzone">
+                    <div class="dz-instruction">拖拽文件到此处，或点击选择</div>
+                    <input type="file" id="file" name="file" required />
+                </div>
+                
+                <div class="file-info" id="fileInfo">
+                    <p>文件名: <span id="fileName"></span></p>
+                    <p>文件大小: <span id="fileSize"></span></p>
+                    <p>SHA-256: <span id="fileHash"></span>
+                        <button type="button" id="copyHashBtn" class="btn-outline small">复制</button>
+                    </p>
+                </div>
+
+                <label for="fileCount">最大下载次数</label>
+                <input type="number" id="fileCount" name="count" value="100000" required />
+
+                <label for="fileExpire">过期时间</label>
+                <div class="expire-row">
+                    <input type="number" id="fileExpire" name="expire" value="7" min="1" required />
+                    <select id="fileExpireUnit" class="expire-unit" aria-label="过期时间单位">
+                        <option value="d" selected>天</option>
+                        <option value="w">周</option>
+                        <option value="m">月</option>
+                    </select>
+                </div>
+
+                <div class="progress-container" id="progressContainer">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="progress-text" id="progressText">0%</div>
+                </div>
+
+                <button type="submit">上传文件</button>
+            </form>
+        </div>
+
+        <div id="text-tab" class="tab-content">
+            <form id="createClipForm" action="/api/clip/create" method="POST">
+                <label for="content">文本内容</label>
+                <textarea id="content" name="content" rows="4" required></textarea>
+
+                <label for="count">最大访问次数</label>
+                <input type="number" id="count" name="count" value="100000" required />
+
+                <label for="expire">过期时间</label>
+                <div class="expire-row">
+                    <input type="number" id="expire" name="expire" value="7" min="1" required />
+                    <select id="expireUnit" class="expire-unit" aria-label="过期时间单位">
+                        <option value="d" selected>天</option>
+                        <option value="w">周</option>
+                        <option value="m">月</option>
+                    </select>
+                </div>
+
+                <button type="submit">创建</button>
+            </form>
+        </div>
+
+        <div id="link-tab" class="tab-content">
+            <form id="createLinkForm" action="/api/clip/create" method="POST">
+                <label for="linkUrl">链接地址</label>
+                <input type="url" id="linkUrl" name="content" placeholder="https://example.com" required />
+
+                <label for="linkCount">最大访问次数</label>
+                <input type="number" id="linkCount" name="count" value="100000" required />
+
+                <label for="linkExpire">过期时间</label>
+                <div class="expire-row">
+                    <input type="number" id="linkExpire" name="expire" value="7" min="1" required />
+                    <select id="linkExpireUnit" class="expire-unit" aria-label="过期时间单位">
+                        <option value="d" selected>天</option>
+                        <option value="w">周</option>
+                        <option value="m">月</option>
+                    </select>
+                </div>
+
+                <input type="hidden" name="link" value="yes" />
+
+                <button type="submit">创建短链接</button>
+            </form>
+        </div>
+        
+
+    </div>
+
+    <div class="result code-box" id="result">
+        <div class="code-box-header">
+            <span>提示</span>
+            <button id="copyCodeBtn" type="button" class="btn-outline small">复制提取码</button>
+        </div>
+        <div class="code-box-body" id="resultBody"></div>
+    </div>
+
+    <div class="history" id="history">
+        <div class="history-header">
+            <h2>历史记录</h2>
+            <button id="clearHistoryBtn" type="button" class="btn-danger">清空历史</button>
+        </div>
+        <ul id="historyList"></ul>
+    </div>
+
+    <script src="crypto-js.min.js"></script>
+    <script src="clip.js"></script>
+</body>
+
+</html>

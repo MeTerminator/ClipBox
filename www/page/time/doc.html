@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Time 功能文档 | MeT-Box</title>
+  <link rel="icon" href="/favicon.ico" type="image/x-icon">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  </style>
+  <!-- 本文档说明如何准备考试 JSON，并通过剪贴板生成 ExamCode 供 Time 页面使用 -->
+  <!-- Time 页面入口：/page/time/ -->
+  <!-- Clip 页面入口：/page/clip/ -->
+  <!-- Time 加载接口：/api/clip/get/{ExamCode} -->
+  <!-- NTP 时间接口：/api/ntptime/ -->
+  <!-- 展示逻辑参考：public/page/time/index.html -->
+</head>
+<body class="bg-white dark:bg-black text-black dark:text-white">
+  <main class="mx-auto max-w-4xl p-6 space-y-8">
+    <header class="space-y-2">
+      <h1 class="text-3xl font-bold">Time 使用文档</h1>
+      <p class="text-gray-600 dark:text-gray-300">通过编辑 JSON 并创建剪贴板（Clip），获取 ExamCode，在 Time 页面加载自定义考试时间表。</p>
+      <div class="flex gap-3 text-sm">
+        <a class="text-blue-600 hover:underline" href="/page/time/" target="_blank">打开 Time 页面</a>
+        <span class="text-gray-400">|</span>
+        <a class="text-blue-600 hover:underline" href="/page/clip/" target="_blank">打开 Clip 剪贴板</a>
+      </div>
+    </header>
+
+    <section class="space-y-3">
+      <h2 class="text-2xl font-semibold">使用步骤</h2>
+      <ol class="list-decimal pl-6 space-y-2">
+        <li><b>准备 JSON：</b> 按下方格式编辑你的考试安排 JSON。</li>
+        <li><b>创建 ExamCode：</b> 复制完整 JSON 文本，访问 <code>/page/clip/</code>，在“文本剪贴板”粘贴后点击“创建”。保存系统返回的 <b>Code</b>（即 <b>ExamCode</b>）。</li>
+        <li><b>在 Time 页面加载：</b> 打开 <code>/page/time/</code>，点击标题中的“自定义考试”，输入刚才的 <b>ExamCode</b>，即可加载并展示倒计时与进度。</li>
+      </ol>
+      <p class="text-sm text-gray-600 dark:text-gray-400">Time 页面会从 <code>/api/clip/get/{ExamCode}</code> 拉取你粘贴的 JSON；时间基于 <code>/api/ntptime/</code> 同步的服务器时间进行计算。</p>
+    </section>
+
+    <section class="space-y-3">
+      <h2 class="text-2xl font-semibold">JSON 格式说明</h2>
+      <ul class="list-disc pl-6 space-y-1">
+        <li><b>name</b>：科目或事件名称（字符串）。</li>
+        <li><b>start_at</b>：开始时间（字符串，建议格式 <code>YYYY-MM-DD HH:mm:ss</code>，24 小时制）。</li>
+        <li><b>duration_hour</b>：持续时长（数字，单位：小时，可为小数）。</li>
+      </ul>
+      <p class="text-sm text-gray-600 dark:text-gray-400">数组按时间先后排序更直观；Time 会自动寻找“尚未结束”的下一场考试并展示状态（未开始 / 考试中）、已过与剩余时间。</p>
+    </section>
+
+    <section class="space-y-3">
+      <h2 class="text-2xl font-semibold">示例 JSON</h2>
+      <p class="text-sm text-gray-600 dark:text-gray-400">复制下方示例，按需修改后作为你的考试安排。粘贴到剪贴板页创建即可获得 ExamCode：</p>
+      <pre class="bg-gray-100 dark:bg-zinc-900 p-4 rounded overflow-x-auto text-sm"><code>[
+  {
+    "name": "语文",
+    "start_at": "2025-06-07 09:00:00",
+    "duration_hour": 2.5
+  },
+  {
+    "name": "数学",
+    "start_at": "2025-06-07 15:00:00",
+    "duration_hour": 2
+  },
+  {
+    "name": "物理历史",
+    "start_at": "2025-06-08 09:00:00",
+    "duration_hour": 1.25
+  },
+  {
+    "name": "外语",
+    "start_at": "2025-06-08 15:00:00",
+    "duration_hour": 2
+  },
+  {
+    "name": "化学",
+    "start_at": "2025-06-09 08:30:00",
+    "duration_hour": 1.25
+  },
+  {
+    "name": "地理",
+    "start_at": "2025-06-09 11:00:00",
+    "duration_hour": 1.25
+  },
+  {
+    "name": "思想政治",
+    "start_at": "2025-06-09 14:30:00",
+    "duration_hour": 1.25
+  },
+  {
+    "name": "生物",
+    "start_at": "2025-06-09 17:00:00",
+    "duration_hour": 1.25
+  }
+]</code></pre>
+    </section>
+
+    <section class="space-y-3">
+      <h2 class="text-2xl font-semibold">常见问题</h2>
+      <ul class="list-disc pl-6 space-y-2 text-sm">
+        <li><b>时区/时间误差：</b> 前端显示基于服务端 <code>/api/ntptime/</code>，请确保服务器时区设置正确；<code>start_at</code> 按服务器所在时区编写。</li>
+        <li><b>ExamCode 无法加载：</b> 检查剪贴板内容是否为有效 JSON；确认该 Clip 未过期、未超最大访问次数。</li>
+        <li><b>顺序与覆盖：</b> 同一时间段多场考试会按数组顺序参与计算；请避免时间重叠或自行定义优先级。</li>
+      </ul>
+    </section>
+
+    <footer class="pt-6 text-xs text-gray-500 dark:text-gray-400">
+      <p>MeT-Box</p>
+    </footer>
+  </main>
+</body>
+</html>
