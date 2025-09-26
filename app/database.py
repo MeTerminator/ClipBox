@@ -11,8 +11,9 @@ db = SQLAlchemy()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# https://github.com/MeTerminator/ClipBox
 class Clip(db.Model):
-    __tablename__ = 'mb_clips'
+    __tablename__ = 'cb_clips'
     
     id = db.Column(db.Integer, primary_key=True)
     code = db.Column(db.String(10), unique=True, nullable=False, index=True)
@@ -86,14 +87,14 @@ def init_database(app):
                     SELECT COUNT(*) AS cnt
                     FROM information_schema.COLUMNS
                     WHERE TABLE_SCHEMA = DATABASE()
-                      AND TABLE_NAME = 'mb_clips'
+                      AND TABLE_NAME = 'cb_clips'
                       AND COLUMN_NAME = 'client_ip'
                 """)
                 result = db.session.execute(check_sql).scalar()
                 if not result:
-                    db.session.execute(text("ALTER TABLE mb_clips ADD COLUMN client_ip VARCHAR(45) NULL AFTER mime_type"))
+                    db.session.execute(text("ALTER TABLE cb_clips ADD COLUMN client_ip VARCHAR(45) NULL AFTER mime_type"))
                     db.session.commit()
-                    logger.info("已为 mb_clips 添加 client_ip 列")
+                    logger.info("已为 cb_clips 添加 client_ip 列")
             except OperationalError as e:
                 db.session.rollback()
                 logger.warning(f"检查/添加 client_ip 列失败: {e}")

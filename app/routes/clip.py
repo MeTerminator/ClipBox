@@ -14,6 +14,7 @@ from urllib.parse import quote
 
 clip_bp = Blueprint('clip', __name__)
 
+# https://github.com/MeTerminator/ClipBox
 
 @clip_bp.route("/create", methods=["POST"])
 def create_clip():

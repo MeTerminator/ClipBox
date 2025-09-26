@@ -1,11 +1,14 @@
 import os
 
+# https://github.com/MeTerminator/ClipBox
 
 class Config:
     # MySQL数据库配置
+    # 优先从环境变量 'DATABASE_URL' 读取，否则使用下面的默认值
+    # 格式: 'mysql+pymysql://<user>:<password>@<host>:<port>/<database>?charset=utf8mb4'
     SQLALCHEMY_DATABASE_URI = os.getenv(
         'DATABASE_URL', 
-        'mysql+pymysql://root:root@127.0.0.1:3306/metbox?charset=utf8mb4'
+        'mysql+pymysql://root:root@127.0.0.1:3306/clipbox?charset=utf8mb4'
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
@@ -13,7 +16,7 @@ class Config:
         'pool_pre_ping': True
     }
 
-    # 真实IP头部（若存在优先使用该头部）
+    # 真实IP头部（若存在优先使用该头部，用于反向代理后获取真实IP）
     REAL_IP_HEADER = os.getenv('REAL_IP_HEADER', 'X-Real-IP')
 
     # 限制配置（可通过环境变量覆盖）

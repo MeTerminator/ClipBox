@@ -4,6 +4,7 @@ from app.routes import register_blueprints
 from app.database import db, init_database
 import os
 
+# https://github.com/MeTerminator/ClipBox
 
 def create_app():
     app = Flask(__name__)
