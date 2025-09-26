@@ -136,6 +136,8 @@ ClipBox 是一个精致高效的临时文件分享站，类似于 [FileCodeBox](
 
 本项目基于 [MIT License](https://github.com/MeTerminator/ClipBox/blob/main/LICENSE) 开源。
 
+[![Star History](https://api.star-history.com/svg?repos=MeTerminator/ClipBox&type=Date)](https://www.star-history.com/#MeTerminator/ClipBox&Date)
+
 ---
 
 - [MeT-Home](https://met6.top/) - MeTerminator's Homepage.
