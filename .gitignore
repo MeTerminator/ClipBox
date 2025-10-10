@@ -35,3 +35,6 @@ test.http
 *.tsbuildinfo
 next-env.d.ts
 __pycache__
+
+# Project specific files
+data/

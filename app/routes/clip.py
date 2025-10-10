@@ -1,4 +1,4 @@
-from flask import redirect, Blueprint, request, jsonify, make_response, current_app
+from flask import redirect, Blueprint, request, jsonify, make_response, send_file, current_app
 from app.database import db
 from app.database import Clip, cleanup_expired_clips
 import random
@@ -10,11 +10,11 @@ import glob
 from datetime import datetime
 from app.utils import get_real_ip
 import threading
-from urllib.parse import quote
 
 clip_bp = Blueprint('clip', __name__)
 
 # https://github.com/MeTerminator/ClipBox
+
 
 @clip_bp.route("/create", methods=["POST"])
 def create_clip():
@@ -80,7 +80,7 @@ def get_clip(code):
 
     # 检查是否过期
     if clip.is_expired():
-        # 删除过期记录
+        # 删除过期记录 (这部分逻辑保持不变)
         if clip.content_type == 'file' and clip.file_path:
             try:
                 other_refs = 0
@@ -98,7 +98,7 @@ def get_clip(code):
         db.session.commit()
         return "Not found", 404
 
-    # 如果是链接类型，检查count是否为0
+    # 如果是链接类型 (这部分逻辑保持不变)
     if clip.content_type == "link":
         if clip.access_count <= 0:
             db.session.delete(clip)
@@ -114,102 +114,44 @@ def get_clip(code):
         # 返回302重定向
         return redirect(clip.content, code=302)
 
-    # 如果是文件类型，处理文件下载
     if clip.content_type == "file":
-        # 检查文件是否存在
-        if not clip.file_path or not os.path.exists(clip.file_path):
+        relative_path = clip.file_path
+        base_dir = current_app.root_path
+        full_file_path = os.path.join(base_dir, "..", relative_path)
+
+        if not os.path.exists(full_file_path):
+            print(f"File not found: {full_file_path}")
             db.session.delete(clip)
             db.session.commit()
-            return "File not found on disk", 404
+            return "Not found", 404
 
-        # 若哈希尚未计算完成，暂不开放下载
-        if not clip.file_hash:
-            return jsonify({"code": code, "status": "processing", "message": "File is processing, please try again later"}), 425
+        clip.file_path = full_file_path
 
-        # 减少访问次数
-        clip.access_count -= 1
-        if clip.access_count <= 0:
-            # 删除文件和记录（若无其他引用）
-            try:
-                other_refs = 0
-                if clip.file_hash:
-                    other_refs = Clip.query.filter(
-                        Clip.file_hash == clip.file_hash,
-                        Clip.id != clip.id
-                    ).count()
-                if other_refs == 0 and os.path.exists(clip.file_path):
-                    os.remove(clip.file_path)
-            except OSError:
-                pass
-            db.session.delete(clip)
-            db.session.commit()
-        else:
-            db.session.commit()
+        # ----------------------------------------------------
+        # 使用 send_file 发送文件 (使用绝对路径)
+        # ----------------------------------------------------
 
-        # 返回文件，支持断点续传
+        mime_type = clip.mime_type or 'application/octet-stream'
+        viewable_types = [
+            'text/', 'application/json', 'application/xml', 'application/javascript'
+        ]
+        is_viewable = any(mime_type.startswith(vtype) for vtype in viewable_types)
+
         try:
-            file_size = clip.file_size or 0
-            mime_type = clip.mime_type or 'application/octet-stream'
-
-            # 判断是否可以在浏览器中直接查看
-            # viewable_types = [
-            #     'text/', 'image/', 'video/', 'audio/', 'application/pdf',
-            #     'application/json', 'application/xml', 'application/javascript'
-            # ]
-            viewable_types = [
-                'text/', 'application/json', 'application/xml', 'application/javascript'
-            ]
-
-            is_viewable = any(mime_type.startswith(vtype) for vtype in viewable_types)
-
-            # 检查是否有Range请求头（断点续传）
-            range_header = request.headers.get('Range')
-
-            if range_header:
-                # 解析Range头
-                range_match = range_header.replace('bytes=', '').split('-')
-                start = int(range_match[0]) if range_match[0] else 0
-                end = int(range_match[1]) if range_match[1] else file_size - 1
-
-                # 确保范围有效
-                if start >= file_size or end >= file_size or start > end:
-                    response = make_response("Requested Range Not Satisfiable", 416)
-                    response.headers['Content-Range'] = f'bytes */{file_size}'
-                    return response
-
-                # 读取指定范围的文件内容
-                with open(clip.file_path, 'rb') as f:
-                    f.seek(start)
-                    chunk_size = end - start + 1
-                    file_content = f.read(chunk_size)
-
-                response = make_response(file_content)
-                response.status_code = 206  # Partial Content
-                response.headers['Content-Range'] = f'bytes {start}-{end}/{file_size}'
-                response.headers['Accept-Ranges'] = 'bytes'
-                response.headers['Content-Length'] = str(chunk_size)
-            else:
-                # 完整文件下载
-                with open(clip.file_path, 'rb') as f:
-                    file_content = f.read()
-
-                response = make_response(file_content)
-                response.headers['Accept-Ranges'] = 'bytes'
-                response.headers['Content-Length'] = str(file_size)
-
-            # 处理非ASCII文件名（包括中文）：同时设置 filename 和 RFC 5987 的 filename*
-            disp_type = 'inline' if is_viewable else 'attachment'
-            fn = clip.filename or "file"
-            safe_fn_star = quote(fn, encoding='utf-8')
-            # 注意：某些浏览器对 filename 的 UTF-8 兼容良好，这里直接放原始名作回退
-            response.headers['Content-Disposition'] = f"{disp_type}; filename=\"{fn}\"; filename*=UTF-8''{safe_fn_star}"
-
-            response.headers['Content-Type'] = mime_type
+            response = send_file(
+                # 将修正后的绝对路径传递给 send_file
+                clip.file_path,
+                mimetype=mime_type,
+                conditional=True,
+                as_attachment=not is_viewable,
+                download_name=clip.filename or "file"
+            )
             return response
-        except Exception as e:
-            return f"Error reading file: {str(e)}", 500
 
-    # 如果是文本类型，减少访问次数并返回内容
+        except Exception as e:
+            return f"Error sending file: {str(e)}", 500
+
+    # 如果是文本类型，减少访问次数并返回内容 (这部分逻辑保持不变)
     clip.access_count -= 1
     if clip.access_count <= 0:
         db.session.delete(clip)
@@ -257,6 +199,7 @@ def upload_file():
 
     # 读取客户端计算的SHA256（可选）
     client_hash = request.form.get('client_sha256', '').strip().lower()
+
     def _is_valid_sha256(h: str) -> bool:
         return len(h) == 64 and all(c in '0123456789abcdef' for c in h)
     client_hash_valid = _is_valid_sha256(client_hash)
