@@ -1,107 +1,110 @@
 # ClipBox
 
+[English](README_CN.md) | [简体中文](README_CN.md)
+
 [![Python](https://img.shields.io/badge/python-3.x-blue.svg)](https://www.python.org/)
 [![Flask](https://img.shields.io/badge/flask-2.x-orange.svg)](https://flask.palletsprojects.com/)
 [![GitHub license](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/MeTerminator/ClipBox/blob/main/LICENSE)
 
-ClipBox 是一个精致高效的临时文件分享站，类似于 [FileCodeBox](https://github.com/vastsa/FileCodeBox)，支持文件分享、剪贴板分享和短链接功能。同时，它还集成了一个独特的考试时钟功能，可根据文档设置考试科目与时间，并支持 NTP 时间同步。
+ClipBox is an exquisite and efficient temporary file sharing station, similar to [FileCodeBox](https://github.com/vastsa/FileCodeBox), supporting file sharing, clipboard sharing, and short link functionality. Additionally, it integrates a unique **Exam Clock** feature, allowing users to set exam subjects and times based on a configuration document and supporting NTP time synchronization.
 
-##  Features
+## Features
 
-- **文件秒传**: 通过前端和后端双重哈希验证，实现文件快速上传，同时保证数据安全。
-- **剪贴板分享**: 支持文本内容的快速分享和跨设备访问。
-- **短链接服务**: 可将长链接生成为易于分享的短链接。
-- **考试时钟**: 可定制化的考试倒计时时钟，支持 NTP 网络时间同步，确保时间精准。
-- **轻量高效**: 基于 Flask 构建，资源占用少，响应迅速。
-- **黑色亮色模式切换**: 支持黑色和亮色模式切换，适应不同环境。
+  * **Instant File Transfer**: Achieves rapid file upload through dual hash verification on the frontend and backend, ensuring data security.
+  * **Clipboard Sharing**: Supports quick sharing of text content and cross-device access.
+  * **Short Link Service**: Can convert long URLs into easy-to-share short links.
+  * **Exam Clock**: A customizable exam countdown clock that supports NTP network time synchronization to ensure precise timing.
+  * **Lightweight and Efficient**: Built on Flask, it has low resource consumption and fast response times.
+  * **Dark/Light Mode Toggle**: Supports switching between dark and light modes to suit different environments.
 
-##  效果演示
+## Demo
 
-| 首页 | 文件上传 | 文本分享 |
+| Home Page | File Upload | Text Sharing |
 | --- | --- | --- |
-| <img src=".github/images/img1.png" alt="首页" width="100%"> | <img src=".github/images/img2.png" alt="文件上传" width="100%"> | <img src=".github/images/img3.png" alt="文本分享" width="100%"> |
+| <img src=".github/images/img1.png" alt="Home Page" width="100%"> | <img src=".github/images/img2.png" alt="File Upload" width="100%"> | <img src=".github/images/img3.png" alt="Text Sharing" width="100%"> |
 
-| 取件码 | 考试时钟 | 时钟文档 |
+| Retrieval Code | Exam Clock | Clock Config Doc |
 | --- | --- | --- |
-| <img src=".github/images/img4.png" alt="取件码" width="100%"> | <img src=".github/images/img5.png" alt="考试时钟" width="100%"> | <img src=".github/images/img6.png" alt="时钟文档" width="100%"> |
+| <img src=".github/images/img4.png" alt="Retrieval Code" width="100%"> | <img src=".github/images/img5.png" alt="Exam Clock" width="100%"> | <img src=".github/images/img6.png" alt="Clock Config Doc" width="100%"> |
 
-##  应用场景
+## Use Cases
 
-- **临时文件传输**: 在不同设备间快速传输文件，无需登录或安装重量级应用。
-- **代码片段分享**: 与同事或朋友分享代码片段、配置文件或日志。
-- **在线考试计时**: 为在线考试或模拟测验提供一个精准、统一的网络倒计时时钟。
-- **链接临时分享**: 将复杂的长链接转换为简洁的短链接，便于在社交媒体或消息应用中分享。
+  * **Temporary File Transfer**: Quickly transfer files between different devices without the need to log in or install heavy applications.
+  * **Code Snippet Sharing**: Share code snippets, configuration files, or logs with colleagues or friends.
+  * **Online Exam Timing**: Provide a precise, unified network countdown clock for online exams or simulated tests.
+  * **Temporary Link Sharing**: Convert complex long links into concise short links for easy sharing on social media or messaging apps.
 
-##  Technical Stack
+## Technical Stack
 
-- **后端**: Flask, Flask-SQLAlchemy
-- **数据库**: MySQL (通过 PyMySQL 连接)
-- **前端**: 原生 HTML, CSS, JavaScript
-- **其他**: NTP
+  * **Backend**: Flask, Flask-SQLAlchemy
+  * **Database**: MySQL (connected via PyMySQL)
+  * **Frontend**: Native HTML, CSS, JavaScript
+  * **Others**: NTP
 
-## 快速上手 (Quick Start)
+## Quick Start
 
-### 环境要求 (Environment Requirements)
+### Environment Requirements
 
   * Python 3.x
   * MySQL
 
-### 本地开发 (Local Development)
+### Local Development
 
-1.  **克隆项目**:
+1.  **Clone the Repository**:
 
     ```bash
     git clone https://github.com/MeTerminator/ClipBox.git
     cd clipbox
     ```
 
-2.  **安装依赖**:
+2.  **Install Dependencies**:
 
     ```bash
     pip install -r requirements.txt
     ```
 
-3.  **配置应用**:
-    - 根据提示修改 `app/config.py` 中的数据库连接信息等配置。
+3.  **Configure the Application**:
 
-4.  **运行应用**:
+      * Modify the database connection information and other configurations in `app/config.py` as prompted.
+
+4.  **Run the Application**:
 
     ```bash
     python main.py
     ```
 
-    应用将在 `http://127.0.0.1:5328` 上运行。
+    The application will be running at `http://127.0.0.1:5328`.
 
-## 生产部署 (Deployment Guide)
+## Deployment Guide
 
-为了在生产环境中稳定运行，推荐使用 WSGI 服务器进行部署。
+For stable operation in a production environment, it is recommended to use a WSGI server for deployment.
 
-### 方案一: Gunicorn (适用于 Linux/macOS)
+### Option 1: Gunicorn (for Linux/macOS)
 
-1.  安装 Gunicorn:
+1.  Install Gunicorn:
 
     ```bash
     pip install gunicorn
     ```
 
-2.  运行应用:
+2.  Run the Application:
 
     ```bash
     gunicorn -w 4 -b 0.0.0.0:5328 'app:create_app()'
     ```
 
-    - `-w 4`: 启动 4 个工作进程。
-    - `-b 0.0.0.0:5328`: 绑定到所有网络接口的 5328 端口。
+      * `-w 4`: Starts 4 worker processes.
+      * `-b 0.0.0.0:5328`: Binds to port 5328 on all network interfaces.
 
-### 方案二: Waitress (适用于 Windows)
+### Option 2: Waitress (for Windows)
 
-1.  安装 Waitress:
+1.  Install Waitress:
 
     ```bash
     pip install waitress
     ```
 
-2.  创建 `run.py` 文件:
+2.  Create a `run.py` file:
 
     ```python
     from waitress import serve
@@ -113,31 +116,31 @@ ClipBox 是一个精致高效的临时文件分享站，类似于 [FileCodeBox](
         serve(app, host='0.0.0.0', port=5328)
     ```
 
-3.  运行应用:
+3.  Run the Application:
 
     ```bash
     python run.py
     ```
 
-## 贡献指南 (Contribution Guide)
+## Contribution Guide
 
-我们欢迎任何形式的贡献！
+We welcome contributions in any form\!
 
-- **报告 Bug**: 如果您发现了 Bug，请通过 [GitHub Issues](https://github.com/MeTerminator/ClipBox/issues) 提交详细信息。
-- **功能建议**: 如果您有新功能的想法，也欢迎通过 Issues 提出。
-- **代码贡献**: 请遵循以下步骤：
-    1. Fork 本仓库。
-    2. 创建您的特性分支 (`git checkout -b feature/AmazingFeature`)。
-    3. 提交您的更改 (`git commit -m 'Add some AmazingFeature'`)。
-    4. 推送到分支 (`git push origin feature/AmazingFeature`)。
-    5. 开启一个 Pull Request。
+  * **Report Bugs**: If you find a bug, please submit the details through [GitHub Issues](https://github.com/MeTerminator/ClipBox/issues).
+  * **Feature Suggestions**: If you have ideas for new features, feel free to propose them via Issues.
+  * **Code Contribution**: Please follow these steps:
+    1.  Fork this repository.
+    2.  Create your feature branch (`git checkout -b feature/AmazingFeature`).
+    3.  Commit your changes (`git commit -m 'Add some AmazingFeature'`).
+    4.  Push to the branch (`git push origin feature/AmazingFeature`).
+    5.  Open a Pull Request.
 
-## 许可证 (License)
+## License
 
-本项目基于 [MIT License](https://github.com/MeTerminator/ClipBox/blob/main/LICENSE) 开源。
+This project is open-sourced under the [MIT License](https://github.com/MeTerminator/ClipBox/blob/main/LICENSE).
 
-[![Star History](https://api.star-history.com/svg?repos=MeTerminator/ClipBox&type=Date)](https://www.star-history.com/#MeTerminator/ClipBox&Date)
+[](https://www.star-history.com/#MeTerminator/ClipBox&Date)
 
----
+----
 
-- [MeT-Home](https://met6.top/) - MeTerminator's Homepage.
+  - [MeT-Home](https://met6.top/) - MeTerminator's Homepage.
