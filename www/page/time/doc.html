@@ -1,56 +1,75 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Time 功能文档 | ClipBox</title>
+  <title data-i18n="doc.title.clip">Time 功能文档 | ClipBox</title>
   <link rel="icon" href="/favicon.ico" type="image/x-icon">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    code,
+    pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
   </style>
-  <!-- 本文档说明如何准备考试 JSON，并通过剪贴板生成 ExamCode 供 Time 页面使用 -->
-  <!-- Time 页面入口：/page/time/ -->
-  <!-- Clip 页面入口：/page/clip/ -->
-  <!-- Time 加载接口：/api/clip/get/{ExamCode} -->
-  <!-- NTP 时间接口：/api/ntptime/ -->
-  <!-- 展示逻辑参考：public/page/time/index.html -->
 </head>
+
 <body class="bg-white dark:bg-black text-black dark:text-white">
+
   <main class="mx-auto max-w-4xl p-6 space-y-8">
     <header class="space-y-2">
-      <h1 class="text-3xl font-bold">Time 使用文档</h1>
-      <p class="text-gray-600 dark:text-gray-300">通过编辑 JSON 并创建剪贴板（Clip），获取 ExamCode，在 Time 页面加载自定义考试时间表。</p>
+      <div class="flex justify-end mb-4">
+        <select id="langSwitcher" class="p-2 border rounded bg-gray-100 dark:bg-zinc-800 dark:border-zinc-700">
+          <option value="zh-CN">中文</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+
+      <h1 class="text-3xl font-bold" data-i18n="doc.title">Time 使用文档</h1>
+      <p class="text-gray-600 dark:text-gray-300" data-i18n="doc.subtitle">通过编辑 JSON 并创建剪贴板（Clip），获取 ExamCode，在 Time
+        页面加载自定义考试时间表。</p>
       <div class="flex gap-3 text-sm">
-        <a class="text-blue-600 hover:underline" href="/page/time/" target="_blank">打开 Time 页面</a>
+        <a class="text-blue-600 hover:underline" href="/page/time/" target="_blank" data-i18n="link.openTime">打开 Time
+          页面</a>
         <span class="text-gray-400">|</span>
-        <a class="text-blue-600 hover:underline" href="/page/clip/" target="_blank">打开 Clip 剪贴板</a>
+        <a class="text-blue-600 hover:underline" href="/page/clip/" target="_blank" data-i18n="link.openClip">打开 Clip
+          剪贴板</a>
       </div>
     </header>
 
     <section class="space-y-3">
-      <h2 class="text-2xl font-semibold">使用步骤</h2>
+      <h2 class="text-2xl font-semibold" data-i18n="section.steps.title">使用步骤</h2>
       <ol class="list-decimal pl-6 space-y-2">
-        <li><b>准备 JSON：</b> 按下方格式编辑你的考试安排 JSON。</li>
-        <li><b>创建 ExamCode：</b> 复制完整 JSON 文本，访问 <code>/page/clip/</code>，在“文本剪贴板”粘贴后点击“创建”。保存系统返回的 <b>Code</b>（即 <b>ExamCode</b>）。</li>
-        <li><b>在 Time 页面加载：</b> 打开 <code>/page/time/</code>，点击标题中的“自定义考试”，输入刚才的 <b>ExamCode</b>，即可加载并展示倒计时与进度。</li>
+        <li><b data-i18n="step.prepare.b">准备 JSON：</b> <span data-i18n="step.prepare.text">按下方格式编辑你的考试安排 JSON。</span>
+        </li>
+        <li><b data-i18n="step.create.b">创建 ExamCode：</b> <span data-i18n="step.create.text1">复制完整 JSON 文本，访问
+            <code>/page/clip/</code>，在“文本剪贴板”粘贴后点击“创建”。保存系统返回的 <b>Code</b>（即 <b>ExamCode</b>）。</span></li>
+        <li><b data-i18n="step.load.b">在 Time 页面加载：</b> <span data-i18n="step.load.text">打开
+            <code>/page/time/</code>，点击标题中的“自定义考试”，输入刚才的 <b>ExamCode</b>，即可加载并展示倒计时与进度。</span></li>
       </ol>
-      <p class="text-sm text-gray-600 dark:text-gray-400">Time 页面会从 <code>/api/clip/get/{ExamCode}</code> 拉取你粘贴的 JSON；时间基于 <code>/api/ntptime/</code> 同步的服务器时间进行计算。</p>
+      <p class="text-sm text-gray-600 dark:text-gray-400" data-i18n="step.note">Time 页面会从
+        <code>/api/clip/get/{ExamCode}</code> 拉取你粘贴的 JSON；时间基于 <code>/api/ntptime/</code> 同步的服务器时间进行计算。
+      </p>
     </section>
 
     <section class="space-y-3">
-      <h2 class="text-2xl font-semibold">JSON 格式说明</h2>
+      <h2 class="text-2xl font-semibold" data-i18n="section.json.title">JSON 格式说明</h2>
       <ul class="list-disc pl-6 space-y-1">
-        <li><b>name</b>：科目或事件名称（字符串）。</li>
-        <li><b>start_at</b>：开始时间（字符串，建议格式 <code>YYYY-MM-DD HH:mm:ss</code>，24 小时制）。</li>
-        <li><b>duration_hour</b>：持续时长（数字，单位：小时，可为小数）。</li>
+        <li><b data-i18n="json.name.b">name</b>：<span data-i18n="json.name.text">科目或事件名称（字符串）。</span></li>
+        <li><b data-i18n="json.start_at.b">start_at</b>：<span data-i18n="json.start_at.text">开始时间（字符串，建议格式
+            <code>YYYY-MM-DD HH:mm:ss</code>，24 小时制）。</span></li>
+        <li><b data-i18n="json.duration.b">duration_hour</b>：<span
+            data-i18n="json.duration.text">持续时长（数字，单位：小时，可为小数）。</span></li>
       </ul>
-      <p class="text-sm text-gray-600 dark:text-gray-400">数组按时间先后排序更直观；Time 会自动寻找“尚未结束”的下一场考试并展示状态（未开始 / 考试中）、已过与剩余时间。</p>
+      <p class="text-sm text-gray-600 dark:text-gray-400" data-i18n="json.note">数组按时间先后排序更直观；Time
+        会自动寻找“尚未结束”的下一场考试并展示状态（未开始 / 考试中）、已过与剩余时间。</p>
     </section>
 
     <section class="space-y-3">
-      <h2 class="text-2xl font-semibold">示例 JSON</h2>
-      <p class="text-sm text-gray-600 dark:text-gray-400">复制下方示例，按需修改后作为你的考试安排。粘贴到剪贴板页创建即可获得 ExamCode：</p>
+      <h2 class="text-2xl font-semibold" data-i18n="section.example.title">示例 JSON</h2>
+      <p class="text-sm text-gray-600 dark:text-gray-400" data-i18n="section.example.note">
+        复制下方示例，按需修改后作为你的考试安排。粘贴到剪贴板页创建即可获得 ExamCode：</p>
       <pre class="bg-gray-100 dark:bg-zinc-900 p-4 rounded overflow-x-auto text-sm"><code>[
   {
     "name": "语文",
@@ -96,11 +115,13 @@
     </section>
 
     <section class="space-y-3">
-      <h2 class="text-2xl font-semibold">常见问题</h2>
+      <h2 class="text-2xl font-semibold" data-i18n="section.faq.title">常见问题</h2>
       <ul class="list-disc pl-6 space-y-2 text-sm">
-        <li><b>时区/时间误差：</b> 前端显示基于服务端 <code>/api/ntptime/</code>，请确保服务器时区设置正确；<code>start_at</code> 按服务器所在时区编写。</li>
-        <li><b>ExamCode 无法加载：</b> 检查剪贴板内容是否为有效 JSON；确认该 Clip 未过期、未超最大访问次数。</li>
-        <li><b>顺序与覆盖：</b> 同一时间段多场考试会按数组顺序参与计算；请避免时间重叠或自行定义优先级。</li>
+        <li data-i18n="faq.timeError"><b>时区/时间误差：</b> 前端显示基于服务端
+          <code>/api/ntptime/</code>，请确保服务器时区设置正确；<code>start_at</code> 按服务器所在时区编写。
+        </li>
+        <li data-i18n="faq.codeFail"><b>ExamCode 无法加载：</b> 检查剪贴板内容是否为有效 JSON；确认该 Clip 未过期、未超最大访问次数。</li>
+        <li data-i18n="faq.overlap"><b>顺序与覆盖：</b> 同一时间段多场考试会按数组顺序参与计算；请避免时间重叠或自行定义优先级。</li>
       </ul>
     </section>
 
@@ -108,5 +129,146 @@
       <p>MeT-Box</p>
     </footer>
   </main>
+
+  <script>
+    // ------------------------------------------------------------------
+    // I18N 国际化数据和逻辑
+    // ------------------------------------------------------------------
+
+    const translations = {
+      'zh-CN': {
+        'doc.title.clip': 'Time 功能文档 | ClipBox',
+        'doc.title': 'Time 使用文档',
+        'doc.subtitle': '通过编辑 JSON 并创建剪贴板（Clip），获取 ExamCode，在 Time 页面加载自定义考试时间表。',
+
+        'link.openTime': '打开 Time 页面',
+        'link.openClip': '打开 Clip 剪贴板',
+
+        'section.steps.title': '使用步骤',
+        'step.prepare.b': '准备 JSON：',
+        'step.prepare.text': '按下方格式编辑你的考试安排 JSON。',
+        'step.create.b': '创建 ExamCode：',
+        'step.create.text1': '复制完整 JSON 文本，访问 /page/clip/，在“文本剪贴板”粘贴后点击“创建”。保存系统返回的 Code（即 ExamCode）。',
+        'step.load.b': '在 Time 页面加载：',
+        'step.load.text': '打开 /page/time/，点击标题中的“自定义考试”，输入刚才的 ExamCode，即可加载并展示倒计时与进度。',
+        'step.note': 'Time 页面会从 /api/clip/get/{ExamCode} 拉取你粘贴的 JSON；时间基于 /api/ntptime/ 同步的服务器时间进行计算。',
+
+        'section.json.title': 'JSON 格式说明',
+        'json.name.b': 'name',
+        'json.name.text': '科目或事件名称（字符串）。',
+        'json.start_at.b': 'start_at',
+        'json.start_at.text': '开始时间（字符串，建议格式 YYYY-MM-DD HH:mm:ss，24 小时制）。',
+        'json.duration.b': 'duration_hour',
+        'json.duration.text': '持续时长（数字，单位：小时，可为小数）。',
+        'json.note': '数组按时间先后排序更直观；Time 会自动寻找“尚未结束”的下一场考试并展示状态（未开始 / 考试中）、已过与剩余时间。',
+
+        'section.example.title': '示例 JSON',
+        'section.example.note': '复制下方示例，按需修改后作为你的考试安排。粘贴到剪贴板页创建即可获得 ExamCode：',
+
+        'section.faq.title': '常见问题',
+        'faq.timeError': '时区/时间误差： 前端显示基于服务端 /api/ntptime/，请确保服务器时区设置正确；start_at 按服务器所在时区编写。',
+        'faq.codeFail': 'ExamCode 无法加载： 检查剪贴板内容是否为有效 JSON；确认该 Clip 未过期、未超最大访问次数。',
+        'faq.overlap': '顺序与覆盖： 同一时间段多场考试会按数组顺序参与计算；请避免时间重叠或自行定义优先级。'
+      },
+      'en': {
+        'doc.title.clip': 'Time Feature Documentation | ClipBox',
+        'doc.title': 'Time Usage Documentation',
+        'doc.subtitle': 'Generate an ExamCode by editing JSON and creating a Clipboard (Clip), then load a custom exam schedule on the Time page.',
+
+        'link.openTime': 'Open Time Page',
+        'link.openClip': 'Open Clip Clipboard',
+
+        'section.steps.title': 'Usage Steps',
+        'step.prepare.b': 'Prepare JSON:',
+        'step.prepare.text': 'Edit your exam schedule JSON according to the format below.',
+        'step.create.b': 'Create ExamCode:',
+        'step.create.text1': 'Copy the full JSON text, visit /page/clip/, paste it into the "Text Clipboard," and click "Create." Save the returned Code (which is the ExamCode).',
+        'step.load.b': 'Load on Time Page:',
+        'step.load.text': 'Open /page/time/, click "Custom Exam" in the title, and enter the ExamCode to load and display the countdown and progress.',
+        'step.note': 'The Time page fetches your pasted JSON from /api/clip/get/{ExamCode}; time calculations are based on server time synchronized via /api/ntptime/.',
+
+        'section.json.title': 'JSON Format Guide',
+        'json.name.b': 'name',
+        'json.name.text': 'Subject or event name (string).',
+        'json.start_at.b': 'start_at',
+        'json.start_at.text': 'Start time (string, recommended format YYYY-MM-DD HH:mm:ss, 24-hour format).',
+        'json.duration.b': 'duration_hour',
+        'json.duration.text': 'Duration (number, unit: hours, can be decimal).',
+        'json.note': 'Sorting the array chronologically is clearer; Time automatically finds the next "not yet finished" exam and displays its status (Not Started / In Progress), elapsed time, and remaining time.',
+
+        'section.example.title': 'Example JSON',
+        'section.example.note': 'Copy the example below, modify it as your exam schedule. Paste it onto the clipboard page to create the ExamCode:',
+
+        'section.faq.title': 'FAQ (Frequently Asked Questions)',
+        'faq.timeError': 'Time Zone/Time Error: The front-end display is based on the server-side /api/ntptime/. Ensure the server time zone setting is correct; start_at should be written according to the server\'s time zone.',
+        'faq.codeFail': 'ExamCode Fails to Load: Check if the clipboard content is valid JSON; confirm the Clip is not expired or exceeded max access count.',
+        'faq.overlap': 'Order and Overlap: Multiple exams at the same time slot will be calculated in array order; avoid time overlaps or define your own priorities.'
+      }
+    };
+
+    let currentLang = 'zh-CN';
+
+    // 翻译函数：根据 key 获取当前语言的文本
+    function T(key) {
+      const langData = translations[currentLang];
+      if (langData && langData[key]) {
+        return langData[key];
+      }
+      // 降级到中文
+      return translations['zh-CN'][key] || key;
+    }
+
+    // 应用翻译到页面
+    function applyI18n() {
+      // 翻译页面标题
+      const titleEl = document.querySelector('title');
+      if (titleEl) {
+        titleEl.textContent = T('doc.title.clip');
+      }
+
+      // 翻译所有带 data-i18n 属性的元素
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        // 特殊处理粗体 (<b>) 内部的翻译，防止覆盖整个结构
+        if (el.tagName === 'B') {
+          el.textContent = T(key);
+        } else {
+          // 对于普通元素，直接设置内容
+          el.innerHTML = T(key);
+        }
+      });
+
+      // 重新设置 body 的语言属性
+      document.documentElement.lang = currentLang;
+    }
+
+    // 设置和切换语言
+    function setLanguage(lang) {
+      currentLang = lang;
+      localStorage.setItem('userLang', lang); // 持久化语言选择
+      applyI18n();
+    }
+
+    // 页面初始化
+    document.addEventListener('DOMContentLoaded', () => {
+      // 1. 从 localStorage 获取上次的语言选择，否则默认中文
+      const savedLang = localStorage.getItem('userLang') || 'zh-CN';
+      currentLang = savedLang;
+
+      // 2. 绑定语言切换事件
+      const switcher = document.getElementById('langSwitcher');
+      if (switcher) {
+        // 设置切换器的初始值
+        switcher.value = currentLang;
+        switcher.addEventListener('change', (event) => {
+          setLanguage(event.target.value);
+        });
+      }
+
+      // 3. 应用初始翻译
+      applyI18n();
+    });
+  </script>
 </body>
+
 </html>

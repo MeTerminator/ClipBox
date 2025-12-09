@@ -1,0 +1,13 @@
+{
+    "pageTitle": "ClipBox | Home",
+    "welcomeTitle": "Welcome to ClipBox",
+    "welcomeDesc": "Enter 5-digit pickup code to quickly get text, links, or files",
+    "pickupCodePlaceholder": "Enter the 5-digit pickup code, e.g., 12345",
+    "pickupCodeLabel": "Pickup Code",
+    "pickupButton": "Pick Up Now",
+    "pickupTips": "Tip: Press Enter to pick up directly. Short links will be redirected automatically, text will be displayed directly, and files will start downloading.",
+    "clipTitle": "📋 Clipboard",
+    "clipDesc": "Create pickup codes, share text, links, and files across devices",
+    "timeTitle": "⏱️ Time Tools",
+    "timeDesc": "World clock, timestamp conversion, etc."
+}

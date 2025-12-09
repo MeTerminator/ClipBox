@@ -1,48 +1,64 @@
 <!DOCTYPE html>
-<html lang="zh-cn">
+<html lang="en" data-lang="en">
+
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ClipBox | 首页</title>
-  <link rel="icon" href="/favicon.ico" type="image/x-icon">
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-i18n="pageTitle">ClipBox | Home</title>
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
-  <header>
-    <a class="brand" href="/">
-      <span class="logo"></span>
-      <span class="title">ClipBox</span>
-    </a>
-    <span class="small"><a href="https://github.com/MeTerminator/ClipBox" target="_blank" style="text-decoration: none; color: inherit;">GitHub</a></span>
-  </header>
-  <main>
-    <section class="card">
-      <div class="hero">
-        <h1>欢迎使用 ClipBox</h1>
-        <p>输入 5 位取件码，快速获取文本、链接或文件</p>
-      </div>
-      <div class="pickup">
-        <input id="pickupCode" type="text" inputmode="numeric" pattern="\\d{5}" maxlength="5" placeholder="请输入 5 位取件码，例如 12345" aria-label="取件码">
-        <button id="pickupBtn" type="button">立即取件</button>
-      </div>
-      <div class="tips">提示：回车键可直接取件。短链接将自动重定向，文本将直接显示，文件将开始下载。</div>
-
-      <div class="links">
-        <a class="link-item" href="/page/clip/">
-          <h3>📋 剪贴板</h3>
-          <p>创建取件码，跨端分享文本、链接与文件</p>
+    <header>
+        <a class="brand" href="/">
+            <span class="logo"></span>
+            <span class="title">ClipBox</span>
         </a>
-        <a class="link-item" href="/page/time/">
-          <h3>⏱️ 时间工具</h3>
-          <p>世界时钟、时间戳互转等</p>
-        </a>
-      </div>
-    </section>
-  </main>
-  <footer>
-    <div>© <span id="year"></span> <a href="https://github.com/MeTerminator/ClipBox" target="_blank" style="text-decoration: none; color: inherit;">ClipBox</a></div>
-  </footer>
+        <span class="small"><a href="https://github.com/MeTerminator/ClipBox" target="_blank"
+                style="text-decoration: none; color: inherit;">GitHub</a></span>
 
-  <script src="index.js"></script>
+        <select id="language-switcher" onchange="changeLanguage(this.value)">
+            <option value="en">English</option>
+            <option value="zh">简体中文</option>
+        </select>
+
+    </header>
+    <main>
+        <section class="card">
+            <div class="hero">
+                <h1 data-i18n="welcomeTitle">Welcome to ClipBox</h1>
+                <p data-i18n="welcomeDesc">Enter 5-digit pickup code to quickly get text, links, or files</p>
+            </div>
+            <div class="pickup">
+                <input id="pickupCode" type="text" inputmode="numeric" pattern="\\d{5}" maxlength="5"
+                    data-i18n-placeholder="pickupCodePlaceholder" data-i18n-aria-label="pickupCodeLabel"
+                    placeholder="Enter the 5-digit pickup code, e.g., 12345" aria-label="Pickup Code">
+                <button id="pickupBtn" type="button" data-i18n="pickupButton">Pick Up Now</button>
+            </div>
+            <div class="tips" data-i18n="pickupTips">Tip: Press Enter to pick up directly. Short links will be
+                redirected
+                automatically, text will be displayed directly, and files will start downloading.</div>
+
+            <div class="links">
+                <a class="link-item" href="/page/clip/">
+                    <h3 data-i18n="clipTitle">📋 Clipboard</h3>
+                    <p data-i18n="clipDesc">Create pickup codes, share text, links, and files across devices</p>
+                </a>
+                <a class="link-item" href="/page/time/">
+                    <h3 data-i18n="timeTitle">⏱️ Time Tools</h3>
+                    <p data-i18n="timeDesc">World clock, timestamp conversion, etc.</p>
+                </a>
+            </div>
+        </section>
+    </main>
+    <footer>
+        <div>© <span id="year"></span> <a href="https://github.com/MeTerminator/ClipBox" target="_blank"
+                style="text-decoration: none; color: inherit;">ClipBox</a></div>
+    </footer>
+
+    <script src="i18n.js"></script>
+    <script src="index.js"></script>
 </body>
+
 </html>

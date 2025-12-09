@@ -1,0 +1,13 @@
+{
+    "pageTitle": "ClipBox | 首页",
+    "welcomeTitle": "欢迎使用 ClipBox",
+    "welcomeDesc": "输入 5 位取件码，快速获取文本、链接或文件",
+    "pickupCodePlaceholder": "请输入 5 位取件码，例如 12345",
+    "pickupCodeLabel": "取件码",
+    "pickupButton": "立即取件",
+    "pickupTips": "提示：回车键可直接取件。短链接将自动重定向，文本将直接显示，文件将开始下载。",
+    "clipTitle": "📋 剪贴板",
+    "clipDesc": "创建取件码，跨端分享文本、链接与文件",
+    "timeTitle": "⏱️ 时间工具",
+    "timeDesc": "世界时钟、时间戳互转等"
+}

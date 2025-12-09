@@ -18,7 +18,7 @@ body {
     margin: 0;
     background: #fff;
     color: #000;
-    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -46,8 +46,6 @@ body {
     z-index: 10;
     width: 100%;
     max-width: 64rem;
-    /* ~ max-w-5xl */
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     font-size: 0.875rem;
     display: flex;
     align-items: center;
