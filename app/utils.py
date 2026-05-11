@@ -1,21 +1,19 @@
 from typing import Optional
-from flask import Request, current_app
-
+from fastapi import Request
+from app.config import settings
 
 def get_real_ip(request: Request) -> Optional[str]:
     """
     获取真实客户端IP：
     1) 优先读取配置的头部（默认 X-Real-IP）
-    2) 否则回退到 request.remote_addr
+    2) 否则回退到 request.client.host
     """
-    header_name = current_app.config.get('REAL_IP_HEADER', 'X-Real-IP')
+    header_name = settings.REAL_IP_HEADER
     ip = request.headers.get(header_name)
 
-    # 某些代理可能会传递空字符串
     if ip:
-        # 去掉可能的多IP（虽然 X-Real-IP 通常只有一个）
         ip = ip.split(',')[0].strip()
         if ip:
             return ip
 
-    return request.remote_addr
+    return request.client.host if request.client else None

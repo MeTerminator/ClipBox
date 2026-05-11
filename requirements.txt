@@ -1,6 +1,8 @@
-flask
-flask-sqlalchemy
+fastapi
+uvicorn
+sqlalchemy
 pymysql
-flask_cors
-ntplib
+python-multipart
 validators
+pydantic
+pydantic-settings
