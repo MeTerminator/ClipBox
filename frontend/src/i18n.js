@@ -29,6 +29,10 @@ const messages = {
       backToHome: 'Back to Home',
       copy: 'Copy',
       copied: 'Copied!',
+      redirectNotice: '💡 File upload hosting, will authorize to: {domain}',
+      redirectMsg: 'Upload successful. Redirect to {domain}?',
+      redirectBtn: 'Redirect Now',
+      stayBtn: 'Stay Here',
       units: {
         seconds: 'Seconds',
         minutes: 'Minutes',
@@ -71,6 +75,10 @@ const messages = {
       backToHome: '返回主页',
       copy: '复制',
       copied: '已复制!',
+      redirectNotice: '💡 文件上传托管，将授权至：{domain}',
+      redirectMsg: '上传成功。是否跳转至 {domain}？',
+      redirectBtn: '立即跳转',
+      stayBtn: '留在当前页',
       units: {
         seconds: '秒',
         minutes: '分',

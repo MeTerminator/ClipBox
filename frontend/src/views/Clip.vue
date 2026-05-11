@@ -3,6 +3,9 @@
     <div class="header-row">
       <router-link to="/" class="back-link">← {{ $t('clip.backToHome') || 'Back' }}</router-link>
     </div>
+    <div v-if="route.query.redirect" class="info-banner">
+      {{ $t('clip.redirectNotice', { domain: getDomain(route.query.redirect) }) }}
+    </div>
     <div class="tabs">
       <button v-for="tab in ['text', 'link', 'file', 'history']" :key="tab"
         :class="['tab-btn', { active: activeTab === tab }]" @click="activeTab = tab">
@@ -60,6 +63,14 @@
         </button>
       </form>
 
+      <div v-if="pendingRedirect" class="result-box redirect-box-confirm">
+        <p>{{ $t('clip.redirectMsg', { domain: getDomain(route.query.redirect) }) }}</p>
+        <div class="redirect-actions">
+          <button @click="doRedirect" class="btn">{{ $t('clip.redirectBtn') }}</button>
+          <button @click="pendingRedirect = null" class="btn secondary-btn">{{ $t('clip.stayBtn') }}</button>
+        </div>
+      </div>
+
       <div v-if="resultCode" class="result-box">
         <p>{{ $t('clip.success') }} <a :href="`/clip/${resultCode}`" target="_blank">{{ resultCode }}</a></p>
         <button @click="copyCode(resultCode)" class="btn copy-btn">{{ $t('clip.copy') }}</button>
@@ -89,7 +100,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
+import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+
+const route = useRoute()
+const { t } = useI18n()
 
 const activeTab = ref('text')
 const formData = ref({
@@ -103,6 +119,7 @@ const dragover = ref(false)
 const loading = ref(false)
 const resultCode = ref('')
 const errorMsg = ref('')
+const pendingRedirect = ref(null)
 const history = ref([])
 const fileInput = ref(null)
 
@@ -163,6 +180,15 @@ const submitClip = async () => {
     if (res.ok && data.code) {
       resultCode.value = data.code
       addToHistory(data.code, activeTab.value, selectedFile.value?.name)
+
+      // Handle redirect
+      const redirectUrl = route.query.redirect
+      if (redirectUrl) {
+        const url = new URL(String(redirectUrl))
+        url.searchParams.set('filecode', data.code)
+        pendingRedirect.value = url.toString()
+      }
+
       formData.value.content = ''
       selectedFile.value = null
     } else {
@@ -172,6 +198,20 @@ const submitClip = async () => {
     errorMsg.value = err.message
   } finally {
     loading.value = false
+  }
+}
+
+const getDomain = (url) => {
+  try {
+    return new URL(String(url)).hostname
+  } catch (e) {
+    return String(url)
+  }
+}
+
+const doRedirect = () => {
+  if (pendingRedirect.value) {
+    window.location.href = pendingRedirect.value
   }
 }
 
@@ -217,6 +257,16 @@ const getIcon = (type) => {
 
 .back-link:hover {
   color: var(--primary);
+}
+
+.info-banner {
+  background: rgba(14, 165, 233, 0.1);
+  border: 1px solid rgba(14, 165, 233, 0.3);
+  color: var(--accent);
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.875rem;
 }
 
 .clip-view {
@@ -342,6 +392,30 @@ textarea.input-field {
   font-weight: bold;
   text-decoration: none;
   font-size: 1.2rem;
+}
+
+.redirect-box-confirm {
+  background: rgba(14, 165, 233, 0.1);
+  border-color: rgba(14, 165, 233, 0.3);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.redirect-actions {
+  display: flex;
+  gap: 1rem;
+  width: 100%;
+}
+
+.secondary-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border);
+  color: var(--fg);
+}
+
+.secondary-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .error-box {

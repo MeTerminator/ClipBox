@@ -38,6 +38,7 @@ __pycache__
 
 # Project specific files
 data/
+www
 
 # Logs
 logs
