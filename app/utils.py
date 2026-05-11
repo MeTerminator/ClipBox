@@ -2,6 +2,7 @@ from typing import Optional
 from fastapi import Request
 from app.config import settings
 
+
 def get_real_ip(request: Request) -> Optional[str]:
     """
     获取真实客户端IP：
@@ -12,7 +13,7 @@ def get_real_ip(request: Request) -> Optional[str]:
     ip = request.headers.get(header_name)
 
     if ip:
-        ip = ip.split(',')[0].strip()
+        ip = ip.split(",")[0].strip()
         if ip:
             return ip
 
