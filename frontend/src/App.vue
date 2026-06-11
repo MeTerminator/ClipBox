@@ -1,21 +1,30 @@
 <template>
-  <header class="app-header">
-    <router-link to="/" class="brand">
-      <div class="logo"></div>
-      <span class="title">ClipBox</span>
-    </router-link>
-    <div class="actions">
-      <select v-model="$i18n.locale" @change="saveLang" class="lang-select">
-        <option value="en">English</option>
-        <option value="zh">简体中文</option>
-      </select>
-      <button class="theme-toggle" @click="toggleTheme">
-        {{ isLight ? '🌙' : '☀️' }}
-      </button>
+  <Toaster />
+  <header class="sticky top-0 z-50 w-full bg-background border-b border-border">
+    <div class="container flex h-14 max-w-screen-md items-center justify-between py-0">
+      <router-link to="/" class="flex items-center gap-2 font-bold text-lg text-foreground hover:text-foreground/80 transition-colors">
+        <span>ClipBox</span>
+      </router-link>
+      <div class="flex items-center gap-4">
+        <Select v-model="locale" @update:modelValue="saveLang">
+          <SelectTrigger class="w-[110px] h-9 border-border bg-transparent focus:ring-1 focus:ring-foreground">
+            <SelectValue placeholder="Language" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="en">English</SelectItem>
+            <SelectItem value="zh">简体中文</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Button variant="outline" size="icon" @click="toggleTheme" class="h-9 w-9 border-border bg-transparent hover:bg-foreground hover:text-background transition-colors">
+          <Sun v-if="isLight" class="h-4 w-4" />
+          <Moon v-else class="h-4 w-4" />
+        </Button>
+      </div>
     </div>
   </header>
 
-  <main class="container">
+  <main class="container max-w-screen-md py-8 flex-1">
     <router-view v-slot="{ Component }">
       <transition name="fade" mode="out-in">
         <component :is="Component" />
@@ -23,114 +32,62 @@
     </router-view>
   </main>
 
-  <footer class="app-footer">
-    <p>&copy; {{ new Date().getFullYear() }} <a href="https://github.com/MeTerminator/ClipBox"
-        target="_blank">ClipBox</a></p>
+  <footer class="bg-background border-t border-border py-6 mt-12">
+    <div class="container max-w-screen-md flex flex-col items-center justify-between gap-4">
+      <p class="text-center text-sm leading-loose text-muted-foreground">
+        &copy; {{ new Date().getFullYear() }} 
+        <a href="https://github.com/MeTerminator/ClipBox" target="_blank" class="font-medium underline underline-offset-4 hover:text-foreground">
+          ClipBox
+        </a>
+      </p>
+    </div>
   </footer>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { Toaster } from '@/components/ui/sonner'
+import { Button } from '@/components/ui/button'
+import { Sun, Moon } from 'lucide-vue-next'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
+const { locale } = useI18n()
 const isLight = ref(false)
 
 onMounted(() => {
   const theme = localStorage.getItem('theme') || 'dark'
   isLight.value = theme === 'light'
-  if (isLight.value) document.body.classList.add('light-mode')
+  if (theme === 'dark') {
+    document.documentElement.classList.add('dark')
+  } else {
+    document.documentElement.classList.remove('dark')
+  }
 })
 
 const toggleTheme = () => {
   isLight.value = !isLight.value
   if (isLight.value) {
-    document.body.classList.add('light-mode')
+    document.documentElement.classList.remove('dark')
     localStorage.setItem('theme', 'light')
   } else {
-    document.body.classList.remove('light-mode')
+    document.documentElement.classList.add('dark')
     localStorage.setItem('theme', 'dark')
   }
 }
 
-const saveLang = (e) => {
-  localStorage.setItem('lang', e.target.value)
+const saveLang = (value) => {
+  localStorage.setItem('lang', value)
 }
 </script>
 
 <style scoped>
-.app-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 2rem;
-  background: rgba(17, 24, 39, 0.5);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--border);
-}
-
-.light-mode .app-header {
-  background: rgba(255, 255, 255, 0.5);
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  text-decoration: none;
-  color: var(--fg);
-  font-weight: bold;
-  font-size: 1.25rem;
-}
-
-.logo {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, var(--primary), var(--accent));
-}
-
-.actions {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.lang-select {
-  background: transparent;
-  color: var(--fg);
-  border: 1px solid var(--border);
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.25rem;
-  outline: none;
-}
-
-.lang-select option {
-  background: var(--bg);
-}
-
-.theme-toggle {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 1.25rem;
-  color: var(--fg);
-}
-
-.app-footer {
-  text-align: center;
-  padding: 1.5rem;
-  color: var(--muted);
-  font-size: 0.875rem;
-}
-
-.app-footer a {
-  color: inherit;
-  text-decoration: none;
-}
-
-.app-footer a:hover {
-  text-decoration: underline;
-}
-
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.2s ease, transform 0.2s ease;

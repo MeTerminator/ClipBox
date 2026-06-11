@@ -1,0 +1,4 @@
+allowBuilds:
+  vue-demi: true
+minimumReleaseAgeExclude:
+  - reka-ui@2.9.10

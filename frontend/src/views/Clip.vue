@@ -1,108 +1,235 @@
 <template>
-  <div class="glass-card clip-view">
-    <div class="header-row">
-      <router-link to="/" class="back-link">← {{ $t('clip.backToHome') || 'Back' }}</router-link>
-    </div>
-    <div v-if="route.query.redirect" class="info-banner">
-      {{ $t('clip.redirectNotice', { domain: getDomain(route.query.redirect) }) }}
-    </div>
-    <div class="tabs">
-      <button v-for="tab in ['text', 'link', 'file', 'history']" :key="tab"
-        :class="['tab-btn', { active: activeTab === tab }]" @click="activeTab = tab">
-        {{ $t(`clip.${tab}`) }}
-      </button>
+  <Card class="border border-border bg-card shadow-none p-6 animate-in fade-in duration-200">
+    <!-- Header Back Link -->
+    <div class="mb-6">
+      <router-link to="/" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+        <ArrowLeftIcon class="h-4 w-4" />
+        {{ $t('clip.backToHome') || 'Back' }}
+      </router-link>
     </div>
 
-    <div class="tab-content" v-if="activeTab !== 'history'">
-      <form @submit.prevent="submitClip" class="clip-form">
-        <div class="form-group" v-if="activeTab === 'text'">
-          <label>{{ $t('clip.contentLabel') }}</label>
-          <textarea v-model="formData.content" class="input-field" rows="6" required></textarea>
+    <!-- Redirect notice banner -->
+    <div v-if="route.query.redirect" class="flex items-start gap-2.5 p-3 border border-border bg-transparent text-foreground rounded-lg text-sm mb-6">
+      <InfoIcon class="h-4 w-4 mt-0.5 shrink-0" />
+      <span>{{ $t('clip.redirectNotice', { domain: getDomain(route.query.redirect) }) }}</span>
+    </div>
+
+    <!-- Tabs Navigation -->
+    <Tabs v-model="activeTab" class="w-full">
+      <TabsList class="grid w-full grid-cols-4 mb-6">
+        <TabsTrigger value="text">{{ $t('clip.text') }}</TabsTrigger>
+        <TabsTrigger value="link">{{ $t('clip.link') }}</TabsTrigger>
+        <TabsTrigger value="file">{{ $t('clip.file') }}</TabsTrigger>
+        <TabsTrigger value="history">{{ $t('clip.history') }}</TabsTrigger>
+      </TabsList>
+    </Tabs>
+
+    <!-- Form Section -->
+    <div v-if="activeTab !== 'history'">
+      <form @submit.prevent="submitClip" class="space-y-6">
+        <!-- Text Tab Input -->
+        <div class="flex flex-col gap-2" v-if="activeTab === 'text'">
+          <Label class="text-sm font-semibold text-muted-foreground">{{ $t('clip.contentLabel') }}</Label>
+          <Textarea 
+            v-model="formData.content" 
+            class="min-h-[150px] bg-transparent border-border focus-visible:ring-1 focus-visible:ring-foreground" 
+            required 
+          />
         </div>
 
-        <div class="form-group" v-if="activeTab === 'link'">
-          <label>{{ $t('clip.linkUrl') }}</label>
-          <input v-model="formData.content" type="url" class="input-field" required />
+        <!-- Link Tab Input -->
+        <div class="flex flex-col gap-2" v-if="activeTab === 'link'">
+          <Label class="text-sm font-semibold text-muted-foreground">{{ $t('clip.linkUrl') }}</Label>
+          <Input 
+            v-model="formData.content" 
+            type="url" 
+            class="bg-transparent border-border focus-visible:ring-1 focus-visible:ring-foreground" 
+            required 
+          />
         </div>
 
-        <div class="form-group" v-if="activeTab === 'file'">
-          <label>{{ $t('clip.selectFile') }}</label>
-          <div class="file-drop-zone" @dragover.prevent="dragover = true" @dragleave.prevent="dragover = false"
-            @drop.prevent="handleDrop" :class="{ dragover }">
-            <input type="file" ref="fileInput" @change="handleFileSelect" class="hidden-file-input" />
-            <div class="drop-content" @click="$refs.fileInput.click()">
-              <p v-if="!selectedFile">Drag & Drop or Click to select</p>
-              <p v-else class="file-selected">{{ selectedFile.name }} ({{ formatSize(selectedFile.size) }})</p>
+        <!-- File Tab Input -->
+        <div class="flex flex-col gap-2" v-if="activeTab === 'file'">
+          <Label class="text-sm font-semibold text-muted-foreground">{{ $t('clip.selectFile') }}</Label>
+          <div 
+            @dragover.prevent="dragover = true" 
+            @dragleave.prevent="dragover = false"
+            @drop.prevent="handleDrop" 
+            :class="[
+              'rounded-lg p-8 text-center cursor-pointer transition-colors duration-200 flex flex-col items-center justify-center min-h-[150px]',
+              dragover ? 'border-foreground border-solid' : 'border-border hover:border-foreground border-dashed border'
+            ]"
+            @click="fileInput.click()"
+          >
+            <input type="file" ref="fileInput" @change="handleFileSelect" class="hidden" />
+            <div class="space-y-2">
+              <div class="flex justify-center text-muted-foreground">
+                <UploadCloudIcon class="h-10 w-10 stroke-1" />
+              </div>
+              <div class="text-sm">
+                <p v-if="!selectedFile" class="font-medium text-foreground">
+                  Drag & Drop or Click to select
+                </p>
+                <p v-else class="font-bold text-foreground">
+                  {{ selectedFile.name }} ({{ formatSize(selectedFile.size) }})
+                </p>
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="options-row">
-          <div class="form-group">
-            <label>{{ $t('clip.countLabel') }}</label>
-            <input v-model="formData.count" type="number" min="1" class="input-field" />
+        <!-- Access Options Row -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="flex flex-col gap-2">
+            <Label class="text-sm font-semibold text-muted-foreground">{{ $t('clip.countLabel') }}</Label>
+            <Input 
+              v-model="formData.count" 
+              type="number" 
+              min="1" 
+              class="bg-transparent border-border focus-visible:ring-1 focus-visible:ring-foreground" 
+            />
           </div>
-          <div class="form-group">
-            <label>{{ $t('clip.expireLabel') }}</label>
-            <div class="input-with-unit">
-              <input v-model="formData.expire" type="number" min="1" class="input-field" />
-              <select v-model="formData.expireUnit" class="unit-select">
-                <option value="1">{{ $t('clip.units.seconds') }}</option>
-                <option value="60">{{ $t('clip.units.minutes') }}</option>
-                <option value="3600">{{ $t('clip.units.hours') }}</option>
-                <option value="86400">{{ $t('clip.units.days') }}</option>
-                <option value="604800">{{ $t('clip.units.weeks') }}</option>
-                <option value="31536000">{{ $t('clip.units.years') }}</option>
-              </select>
+          <div class="flex flex-col gap-2">
+            <Label class="text-sm font-semibold text-muted-foreground">{{ $t('clip.expireLabel') }}</Label>
+            <div class="flex gap-2">
+              <Input 
+                v-model="formData.expire" 
+                type="number" 
+                min="1" 
+                class="flex-1 bg-transparent border-border focus-visible:ring-1 focus-visible:ring-foreground" 
+              />
+              <Select v-model="formData.expireUnit">
+                <SelectTrigger class="w-[110px] bg-transparent border-border focus:ring-1 focus:ring-foreground">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">{{ $t('clip.units.seconds') }}</SelectItem>
+                  <SelectItem value="60">{{ $t('clip.units.minutes') }}</SelectItem>
+                  <SelectItem value="3600">{{ $t('clip.units.hours') }}</SelectItem>
+                  <SelectItem value="86400">{{ $t('clip.units.days') }}</SelectItem>
+                  <SelectItem value="604800">{{ $t('clip.units.weeks') }}</SelectItem>
+                  <SelectItem value="31536000">{{ $t('clip.units.years') }}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </div>
 
-        <button type="submit" class="btn submit-btn" :disabled="loading">
+        <!-- Submit Button -->
+        <Button 
+          type="submit" 
+          class="w-full font-semibold shadow-none border border-foreground bg-foreground text-background hover:bg-background hover:text-foreground py-6 transition-colors"
+          :disabled="loading"
+        >
           {{ loading ? '...' : (activeTab === 'file' ? $t('clip.upload') : $t('clip.create')) }}
-        </button>
+        </Button>
       </form>
 
-      <div v-if="pendingRedirect" class="result-box redirect-box-confirm">
-        <p>{{ $t('clip.redirectMsg', { domain: getDomain(route.query.redirect) }) }}</p>
-        <div class="redirect-actions">
-          <button @click="doRedirect" class="btn">{{ $t('clip.redirectBtn') }}</button>
-          <button @click="pendingRedirect = null" class="btn secondary-btn">{{ $t('clip.stayBtn') }}</button>
+      <!-- Redirect Confirmation Box -->
+      <div v-if="pendingRedirect" class="mt-6 p-4 border border-border bg-transparent rounded-lg space-y-3">
+        <p class="text-muted-foreground text-sm">{{ $t('clip.redirectMsg', { domain: getDomain(route.query.redirect) }) }}</p>
+        <div class="flex gap-3">
+          <Button @click="doRedirect" size="sm" class="text-xs font-semibold">
+            {{ $t('clip.redirectBtn') }}
+          </Button>
+          <Button @click="pendingRedirect = null" size="sm" variant="outline" class="text-xs border-border bg-transparent hover:bg-foreground hover:text-background">
+            {{ $t('clip.stayBtn') }}
+          </Button>
         </div>
       </div>
 
-      <div v-if="resultCode" class="result-box">
-        <p>{{ $t('clip.success') }} <a :href="`/clip/${resultCode}`" target="_blank">{{ resultCode }}</a></p>
-        <button @click="copyCode(resultCode)" class="btn copy-btn">{{ $t('clip.copy') }}</button>
+      <!-- Result Code Box -->
+      <div v-if="resultCode" class="mt-6 p-4 border border-border bg-transparent rounded-lg flex items-center justify-between gap-4">
+        <span class="text-sm font-semibold text-foreground flex items-center gap-1">
+          {{ $t('clip.success') }}
+          <a :href="`/clip/${resultCode}`" target="_blank" class="underline hover:text-foreground/80 font-mono font-bold">
+            {{ resultCode }}
+          </a>
+        </span>
+        <Button 
+          @click="copyCode(resultCode)" 
+          size="sm" 
+          variant="outline" 
+          class="gap-1.5 border-border bg-transparent hover:bg-foreground hover:text-background"
+        >
+          <CopyIcon class="h-3.5 w-3.5" />
+          {{ $t('clip.copy') }}
+        </Button>
       </div>
-      <div v-if="errorMsg" class="error-box">
-        <p>{{ $t('clip.error') }}{{ errorMsg }}</p>
+
+      <!-- Error Message Box -->
+      <div v-if="errorMsg" class="mt-6 p-4 border border-destructive bg-transparent rounded-lg text-sm text-destructive">
+        {{ $t('clip.error') }}{{ errorMsg }}
       </div>
     </div>
 
-    <div class="tab-content history-tab" v-else>
-      <div class="history-header">
-        <h3>{{ $t('clip.history') }}</h3>
-        <button @click="clearHistory" class="btn danger-btn" v-if="history.length">{{ $t('clip.clearHistory')
-        }}</button>
+    <!-- History Tab Section -->
+    <div v-else class="space-y-4">
+      <div class="flex items-center justify-between pb-2">
+        <h3 class="text-lg font-bold text-foreground">{{ $t('clip.history') }}</h3>
+        <Button 
+          v-if="history.length" 
+          @click="clearHistory" 
+          variant="outline" 
+          size="sm" 
+          class="border-border bg-transparent hover:bg-destructive hover:text-destructive-foreground hover:border-destructive gap-1.5"
+        >
+          <Trash2Icon class="h-3.5 w-3.5" />
+          {{ $t('clip.clearHistory') }}
+        </Button>
       </div>
-      <ul class="history-list" v-if="history.length">
-        <li v-for="item in history" :key="item.code" class="history-item">
-          <span class="history-icon">{{ getIcon(item.type) }}</span>
-          <a :href="`/clip/${item.code}`" target="_blank" class="history-link">{{ item.code }}</a>
-          <span class="history-type">({{ $t(`clip.${item.type}`) }})</span>
-          <span class="history-filename" v-if="item.filename">- {{ item.filename }}</span>
+
+      <ul v-if="history.length" class="space-y-2">
+        <li 
+          v-for="item in history" 
+          :key="item.code" 
+          class="flex items-center justify-between p-3 rounded-lg border border-border bg-transparent hover:border-foreground transition-colors"
+        >
+          <div class="flex items-center gap-3 overflow-hidden">
+            <span class="text-muted-foreground shrink-0">
+              <component :is="getIconComponent(item.type)" class="h-4 w-4" />
+            </span>
+            <a :href="`/clip/${item.code}`" target="_blank" class="font-bold font-mono text-foreground hover:underline hover:text-foreground/80 flex items-center gap-1 shrink-0">
+              {{ item.code }}
+              <ExternalLinkIcon class="h-3 w-3 text-muted-foreground" />
+            </a>
+            <span class="text-xs text-muted-foreground shrink-0">({{ $t(`clip.${item.type}`) }})</span>
+            <span v-if="item.filename" class="text-xs text-muted-foreground font-medium truncate max-w-[150px] sm:max-w-[300px]">
+              - {{ item.filename }}
+            </span>
+          </div>
         </li>
       </ul>
-      <p v-else class="empty-state">No history yet.</p>
+      <div v-else class="text-center py-12 border border-dashed rounded-lg border-border/60 text-muted-foreground text-sm">
+        No history yet.
+      </div>
     </div>
-  </div>
+  </Card>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { Card } from '@/components/ui/card'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { toast } from 'vue-sonner'
+import { 
+  ArrowLeftIcon, 
+  UploadCloudIcon, 
+  CopyIcon, 
+  Trash2Icon, 
+  FileTextIcon, 
+  LinkIcon, 
+  FileIcon, 
+  ExternalLinkIcon,
+  InfoIcon
+} from 'lucide-vue-next'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -180,6 +307,7 @@ const submitClip = async () => {
     if (res.ok && data.code) {
       resultCode.value = data.code
       addToHistory(data.code, activeTab.value, selectedFile.value?.name)
+      toast.success(t('clip.success') + data.code)
 
       // Handle redirect
       const redirectUrl = route.query.redirect
@@ -193,9 +321,11 @@ const submitClip = async () => {
       selectedFile.value = null
     } else {
       errorMsg.value = data.error || 'Failed to create clip'
+      toast.error(errorMsg.value)
     }
   } catch (err) {
     errorMsg.value = err.message
+    toast.error(errorMsg.value)
   } finally {
     loading.value = false
   }
@@ -225,268 +355,21 @@ const addToHistory = (code, type, filename = '') => {
 const clearHistory = () => {
   history.value = []
   localStorage.removeItem('clipHistory')
+  toast.success('History cleared')
 }
 
 const copyCode = async (code) => {
   try {
     await navigator.clipboard.writeText(code)
-    alert('Copied!')
+    toast.success(t('clip.copied') || 'Copied!')
   } catch (e) {
-    alert('Failed to copy')
+    toast.error('Failed to copy')
   }
 }
 
-const getIcon = (type) => {
-  if (type === 'file') return '📁'
-  if (type === 'link') return '🔗'
-  return '📝'
+const getIconComponent = (type) => {
+  if (type === 'file') return FileIcon
+  if (type === 'link') return LinkIcon
+  return FileTextIcon
 }
 </script>
-
-<style scoped>
-.header-row {
-  margin-bottom: 1rem;
-}
-
-.back-link {
-  color: var(--muted);
-  text-decoration: none;
-  font-size: 0.875rem;
-  transition: color 0.2s;
-}
-
-.back-link:hover {
-  color: var(--primary);
-}
-
-.info-banner {
-  background: rgba(14, 165, 233, 0.1);
-  border: 1px solid rgba(14, 165, 233, 0.3);
-  color: var(--accent);
-  padding: 0.75rem 1rem;
-  border-radius: 0.5rem;
-  margin-bottom: 1.5rem;
-  font-size: 0.875rem;
-}
-
-.clip-view {
-  animation: slideUp 0.4s ease;
-}
-
-.tabs {
-  display: flex;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 1.5rem;
-  overflow-x: auto;
-}
-
-.tab-btn {
-  background: none;
-  border: none;
-  padding: 1rem 1.5rem;
-  color: var(--muted);
-  font-weight: 600;
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.tab-btn:hover {
-  color: var(--fg);
-}
-
-.tab-btn.active {
-  color: var(--primary);
-  border-bottom-color: var(--primary);
-}
-
-.clip-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  flex: 1;
-}
-
-.form-group label {
-  font-weight: 600;
-  font-size: 0.875rem;
-  color: var(--muted);
-}
-
-.input-with-unit {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.unit-select {
-  background: rgba(0, 0, 0, 0.2);
-  color: var(--fg);
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  padding: 0.5rem;
-  outline: none;
-}
-
-.light-mode .unit-select {
-  background: rgba(255, 255, 255, 0.5);
-}
-
-textarea.input-field {
-  resize: vertical;
-}
-
-.options-row {
-  display: flex;
-  gap: 1rem;
-}
-
-.submit-btn {
-  margin-top: 1rem;
-  width: 100%;
-}
-
-.file-drop-zone {
-  border: 2px dashed var(--border);
-  border-radius: 0.5rem;
-  padding: 3rem 1rem;
-  text-align: center;
-  transition: all 0.2s;
-  background: rgba(0, 0, 0, 0.1);
-  cursor: pointer;
-}
-
-.file-drop-zone.dragover {
-  border-color: var(--primary);
-  background: rgba(34, 197, 94, 0.1);
-}
-
-.hidden-file-input {
-  display: none;
-}
-
-.file-selected {
-  color: var(--primary);
-  font-weight: bold;
-}
-
-.result-box {
-  margin-top: 1.5rem;
-  padding: 1rem;
-  background: rgba(34, 197, 94, 0.1);
-  border: 1px solid rgba(34, 197, 94, 0.3);
-  border-radius: 0.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.result-box a {
-  color: var(--primary);
-  font-weight: bold;
-  text-decoration: none;
-  font-size: 1.2rem;
-}
-
-.redirect-box-confirm {
-  background: rgba(14, 165, 233, 0.1);
-  border-color: rgba(14, 165, 233, 0.3);
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 1rem;
-}
-
-.redirect-actions {
-  display: flex;
-  gap: 1rem;
-  width: 100%;
-}
-
-.secondary-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid var(--border);
-  color: var(--fg);
-}
-
-.secondary-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.error-box {
-  margin-top: 1.5rem;
-  padding: 1rem;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 0.5rem;
-  color: #ef4444;
-}
-
-.history-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
-.danger-btn {
-  background: transparent;
-  color: #ef4444;
-  border: 1px solid #ef4444;
-  padding: 0.5rem 1rem;
-}
-
-.danger-btn:hover {
-  background: #ef4444;
-  color: white;
-}
-
-.history-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.history-item {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1rem;
-  background: rgba(0, 0, 0, 0.1);
-  border-radius: 0.5rem;
-  border: 1px solid var(--border);
-}
-
-.light-mode .history-item {
-  background: rgba(255, 255, 255, 0.5);
-}
-
-.history-link {
-  color: var(--accent);
-  font-weight: bold;
-  text-decoration: none;
-}
-
-.history-link:hover {
-  text-decoration: underline;
-}
-
-.history-type {
-  color: var(--muted);
-  font-size: 0.875rem;
-}
-
-.empty-state {
-  text-align: center;
-  color: var(--muted);
-  padding: 2rem;
-}
-</style>
