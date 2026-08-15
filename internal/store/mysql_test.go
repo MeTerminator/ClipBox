@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/MeTerminator/ClipBox/internal/model"
-	"gorm.io/driver/sqlite"
+	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
