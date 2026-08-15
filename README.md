@@ -84,6 +84,10 @@ To use MySQL, change `driver` to `mysql`, set `dsn` to a Go MySQL DSN such as `r
 
 The default chunk size is 4 MiB, concurrency is 4, and the resume window is 10 minutes. These can be changed using the environment variables documented in [.env.example](.env.example).
 
+## Releases
+
+The repository includes a manually triggered GitHub Actions workflow at `.github/workflows/release.yml`. Run **Build and Release** from the Actions tab to build Linux, Windows, and macOS binaries for amd64 and arm64. Each archive includes the binary, the built frontend `www/` directory, and the project documentation. The workflow publishes a release named with the Shanghai date in `YYMMDD` format and attaches a `SHA256SUMS` file.
+
 ## Test
 
 ```bash

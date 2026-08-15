@@ -1,0 +1,178 @@
+name: Build and Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  GO_VERSION: '1.23.x'
+  NODE_VERSION: '20.x'
+
+jobs:
+  prepare:
+    name: Prepare frontend
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set release version
+        id: version
+        shell: bash
+        run: echo "version=$(TZ=Asia/Shanghai date +%y%m%d)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Run backend tests
+        run: go test ./...
+
+      - name: Upload frontend bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-bundle
+          path: www
+          if-no-files-found: error
+          retention-days: 1
+
+  build:
+    name: Build ${{ matrix.label }} ${{ matrix.arch }}
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            label: linux
+            arch: amd64
+            extension: ''
+            format: tar.gz
+          - goos: linux
+            goarch: arm64
+            label: linux
+            arch: arm64
+            extension: ''
+            format: tar.gz
+          - goos: windows
+            goarch: amd64
+            label: windows
+            arch: amd64
+            extension: .exe
+            format: zip
+          - goos: windows
+            goarch: arm64
+            label: windows
+            arch: arm64
+            extension: .exe
+            format: zip
+          - goos: darwin
+            goarch: amd64
+            label: macos
+            arch: amd64
+            extension: ''
+            format: tar.gz
+          - goos: darwin
+            goarch: arm64
+            label: macos
+            arch: arm64
+            extension: ''
+            format: tar.gz
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Download frontend bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-bundle
+          path: www
+
+      - name: Build and package
+        shell: bash
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          GOOS_VALUE: ${{ matrix.goos }}
+          GOARCH_VALUE: ${{ matrix.goarch }}
+          BINARY_EXTENSION: ${{ matrix.extension }}
+          PACKAGE_FORMAT: ${{ matrix.format }}
+          PLATFORM: ${{ matrix.label }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          package_name="clipbox-${VERSION}-${PLATFORM}-${ARCH}"
+          stage="dist/${package_name}"
+          mkdir -p "$stage"
+          CGO_ENABLED=0 GOOS="$GOOS_VALUE" GOARCH="$GOARCH_VALUE" \
+            go build -trimpath -ldflags="-s -w" -o "$stage/clipbox${BINARY_EXTENSION}" .
+          cp -R www "$stage/www"
+          cp LICENSE README.md README_CN.md "$stage/"
+          if [[ "$PACKAGE_FORMAT" == "zip" ]]; then
+            (cd dist && zip -qr "${package_name}.zip" "$package_name")
+          else
+            (cd dist && tar -czf "${package_name}.tar.gz" "$package_name")
+          fi
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-${{ matrix.label }}-${{ matrix.arch }}
+          path: dist/clipbox-${{ needs.prepare.outputs.version }}-${{ matrix.label }}-${{ matrix.arch }}.*
+          if-no-files-found: error
+          retention-days: 1
+
+  release:
+    name: Publish Release
+    needs:
+      - prepare
+      - build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: package-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create checksums
+        working-directory: release-assets
+        run: sha256sum clipbox-* > SHA256SUMS
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.version }}
+          name: ${{ needs.prepare.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
+          make_latest: true
+          files: release-assets/*
+          fail_on_unmatched_files: true

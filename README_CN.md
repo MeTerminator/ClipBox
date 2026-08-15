@@ -84,6 +84,10 @@ go run .
 
 默认分片大小为 4 MiB、并发数为 4、断点保留时间为 10 分钟。可通过 [.env.example](.env.example) 中的环境变量调整。
 
+## 发布版本
+
+仓库内置了手动触发的 GitHub Actions 工作流 `.github/workflows/release.yml`。在 Actions 页面运行 **Build and Release**，即可构建 Linux、Windows、macOS 的 amd64 和 arm64 版本。每个压缩包都包含对应二进制文件、构建后的 `www/` 前端目录和项目文档。工作流会按上海时区以 `YYMMDD` 格式创建 Release，并附带 `SHA256SUMS` 校验文件。
+
 ## 测试
 
 ```bash
