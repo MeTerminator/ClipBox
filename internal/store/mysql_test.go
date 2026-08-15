@@ -39,6 +39,13 @@ func TestGORMStorePersistsFilesSeparately(t *testing.T) {
 	if err := store.Create(context.Background(), second); err != nil {
 		t.Fatal(err)
 	}
+	third := fileClip("34567", "second.txt", "/different/path", hash, now, 3600)
+	if err := store.Create(context.Background(), third); err != nil {
+		t.Fatal(err)
+	}
+	if second.FileID == nil || third.FileID == nil || *second.FileID != *third.FileID {
+		t.Fatalf("same filename and SHA1 did not reuse file ID: %v/%v", second.FileID, third.FileID)
+	}
 
 	var clipCount, fileCount int64
 	if err := store.db.Model(&model.Clip{}).Count(&clipCount).Error; err != nil {
@@ -47,8 +54,8 @@ func TestGORMStorePersistsFilesSeparately(t *testing.T) {
 	if err := store.db.Model(&model.File{}).Count(&fileCount).Error; err != nil {
 		t.Fatal(err)
 	}
-	if clipCount != 2 || fileCount != 2 {
-		t.Fatalf("clip/file counts = %d/%d, want 2/2", clipCount, fileCount)
+	if clipCount != 3 || fileCount != 2 {
+		t.Fatalf("clip/file counts = %d/%d, want 3/2", clipCount, fileCount)
 	}
 
 	found, err := store.FindFile(context.Background(), hash, "second.txt", now)
@@ -68,7 +75,7 @@ func TestGORMStorePersistsFilesSeparately(t *testing.T) {
 		t.Fatalf("CleanupExpired() = %#v, %d", paths, expired)
 	}
 	references, err := store.CountFileReferences(context.Background(), path, now)
-	if err != nil || references != 1 {
+	if err != nil || references != 2 {
 		t.Fatalf("CountFileReferences() = %d, %v", references, err)
 	}
 }

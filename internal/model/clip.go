@@ -30,9 +30,9 @@ func (Clip) TableName() string { return "cb_clips" }
 // at the same content-addressed path when instant upload reuses the bytes.
 type File struct {
 	ID        int64  `gorm:"primaryKey;autoIncrement"`
-	Filename  string `gorm:"type:varchar(255);not null"`
+	Filename  string `gorm:"type:varchar(255);not null;index:idx_cb_files_filename_sha1,priority:1"`
 	Path      string `gorm:"type:varchar(500);not null;index:idx_cb_files_path"`
-	SHA1      string `gorm:"type:char(40);not null;index:idx_cb_files_sha1"`
+	SHA1      string `gorm:"type:char(40);not null;index:idx_cb_files_sha1,priority:2;index:idx_cb_files_filename_sha1,priority:2"`
 	Size      int64  `gorm:"not null"`
 	MIMEType  string `gorm:"type:varchar(100);not null"`
 	CreatedAt time.Time

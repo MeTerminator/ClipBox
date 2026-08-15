@@ -238,8 +238,17 @@ func (s *GORMStore) Create(ctx context.Context, clip *model.Clip) error {
 			if file == nil {
 				return fmt.Errorf("file clip has no file metadata")
 			}
-			if err := tx.Create(file).Error; err != nil {
-				return err
+			var existing model.File
+			lookupErr := tx.Where("filename = ? AND sha1 = ?", file.Filename, file.SHA1).First(&existing).Error
+			switch {
+			case lookupErr == nil:
+				*file = existing
+			case errors.Is(lookupErr, gorm.ErrRecordNotFound):
+				if err := tx.Create(file).Error; err != nil {
+					return err
+				}
+			default:
+				return lookupErr
 			}
 			clip.FileID = &file.ID
 		}
