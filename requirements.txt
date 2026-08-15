@@ -1,8 +1,0 @@
-fastapi
-uvicorn
-sqlalchemy
-pymysql
-python-multipart
-validators
-pydantic
-pydantic-settings

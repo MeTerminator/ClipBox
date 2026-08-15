@@ -6,7 +6,7 @@ export { default as TabsList } from "./TabsList.vue";
 export { default as TabsTrigger } from "./TabsTrigger.vue";
 
 export const tabsListVariants = cva(
-  "inline-flex h-10 items-center justify-center rounded-lg p-1 text-muted-foreground w-full",
+  "inline-flex box-border h-10 w-full items-center justify-center gap-1 p-1.5 text-muted-foreground",
   {
     variants: {
       variant: {

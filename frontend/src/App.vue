@@ -1,8 +1,17 @@
 <template>
-  <Toaster />
+  <Toaster
+    position="top-right"
+    :theme="isLight ? 'light' : 'dark'"
+    :offset="{ top: 72, right: 16, bottom: 16, left: 16 }"
+    :mobile-offset="{ top: 64, right: 12, bottom: 12, left: 'auto' }"
+    :visible-toasts="1"
+    :expand="false"
+    :close-button="true"
+    :duration="3600"
+  />
   <header class="sticky top-0 z-50 w-full bg-background border-b border-border">
     <div class="container flex h-14 max-w-screen-md items-center justify-between py-0">
-      <router-link to="/" class="flex items-center gap-2 font-bold text-lg text-foreground hover:text-foreground/80 transition-colors">
+      <router-link :to="{ name: 'home' }" class="flex items-center gap-2 font-bold text-lg text-foreground hover:text-foreground/80 transition-colors">
         <span>ClipBox</span>
       </router-link>
       <div class="flex items-center gap-4">
@@ -25,11 +34,7 @@
   </header>
 
   <main class="container max-w-screen-md py-8 flex-1">
-    <router-view v-slot="{ Component }">
-      <transition name="fade" mode="out-in">
-        <component :is="Component" />
-      </transition>
-    </router-view>
+    <router-view />
   </main>
 
   <footer class="bg-background border-t border-border py-6 mt-12">
@@ -86,16 +91,3 @@ const saveLang = (value) => {
   localStorage.setItem('lang', value)
 }
 </script>
-
-<style scoped>
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-  transform: translateY(10px);
-}
-</style>

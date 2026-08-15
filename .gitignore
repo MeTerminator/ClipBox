@@ -26,7 +26,9 @@ yarn-error.log*
 test.http
 
 # local env files
+.env
 .env*.local
+!.env.example
 
 # vercel
 .vercel
@@ -64,4 +66,3 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-

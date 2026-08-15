@@ -16,7 +16,15 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': {
+      '/clip': {
+        target: 'http://localhost:5328',
+        changeOrigin: true
+      },
+      '/file': {
+        target: 'http://localhost:5328',
+        changeOrigin: true
+      },
+      '/text': {
         target: 'http://localhost:5328',
         changeOrigin: true
       }

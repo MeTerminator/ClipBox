@@ -24,9 +24,9 @@ const forwardedProps = useForwardProps(delegatedProps);
     data-slot="tabs-trigger"
     :class="
       cn(
-        'inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-all focus:outline-none disabled:pointer-events-none disabled:opacity-50 select-none cursor-pointer',
+        'inline-flex min-w-0 items-center justify-center whitespace-nowrap rounded-none px-3 py-0 text-sm font-medium transition-all focus:outline-none disabled:pointer-events-none disabled:opacity-50 select-none cursor-pointer',
         'data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-none data-[state=inactive]:text-muted-foreground hover:text-foreground',
-        'w-full h-full flex-1',
+        'w-full self-stretch',
         props.class,
       )
     "

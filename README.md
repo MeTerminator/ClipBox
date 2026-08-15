@@ -1,146 +1,96 @@
 # ClipBox
 
-[English](README_CN.md) | [简体中文](README_CN.md)
+[English](README.md) | [简体中文](README_CN.md)
 
-[![Python](https://img.shields.io/badge/python-3.x-blue.svg)](https://www.python.org/)
-[![Flask](https://img.shields.io/badge/flask-2.x-orange.svg)](https://flask.palletsprojects.com/)
-[![GitHub license](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/MeTerminator/ClipBox/blob/main/LICENSE)
+[![Go](https://img.shields.io/badge/Go-1.23+-00ADD8.svg)](https://go.dev/)
+[![Gin](https://img.shields.io/badge/Gin-1.10-008ECF.svg)](https://gin-gonic.com/)
+[![GitHub license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-ClipBox is an exquisite and efficient temporary file sharing station, similar to [FileCodeBox](https://github.com/vastsa/FileCodeBox), supporting file sharing, clipboard sharing, and short link functionality. Additionally, it integrates a unique **Exam Clock** feature, allowing users to set exam subjects and times based on a configuration document and supporting NTP time synchronization.
+ClipBox is a small temporary sharing service for files, text, and links. A five-digit pickup code resolves to the content while stable SHA1 paths make files and text directly addressable.
 
 ## Features
 
-  * **Instant File Transfer**: Achieves rapid file upload through dual hash verification on the frontend and backend, ensuring data security.
-  * **Clipboard Sharing**: Supports quick sharing of text content and cross-device access.
-  * **Short Link Service**: Can convert long URLs into easy-to-share short links.
-  * **Exam Clock**: A customizable exam countdown clock that supports NTP network time synchronization to ensure precise timing.
-  * **Lightweight and Efficient**: Built on Flask, it has low resource consumption and fast response times.
-  * **Dark/Light Mode Toggle**: Supports switching between dark and light modes to suit different environments.
+- File pickup codes redirect to `/file/<file-sha1>/<original-filename>`; that path is also directly downloadable.
+- Text pickup codes redirect to `/text/<text-sha1>`.
+- Link pickup codes keep the original behavior and redirect straight to the destination URL.
+- Files are uploaded in parallel chunks. Incomplete chunks are kept under `data/tmp/<sha1>` and can be resumed for 10 minutes.
+- The server verifies the complete file SHA1 before moving it into `data/files/<sha1>`.
+- Database access uses GORM. File metadata lives in a separate `cb_files` table linked from `cb_clips.file_id`.
+- New content defaults to 1,000 accesses and expires after one day. The server automatically removes expired records and unreferenced files every minute.
+- Existing `cb_clips` tables are migrated automatically, including legacy file records and missing SHA1 values.
 
-## Demo
+## Stack
 
-| Home Page | File Upload | Text Sharing |
-| --- | --- | --- |
-| <img src=".github/images/img1.png" alt="Home Page" width="100%"> | <img src=".github/images/img2.png" alt="File Upload" width="100%"> | <img src=".github/images/img3.png" alt="Text Sharing" width="100%"> |
+- Backend: Go, Gin, GORM, SQLite/MySQL
+- Frontend: Vue 3, Vite
+- Storage: local content-addressed files under `data/`
 
-| Retrieval Code | Exam Clock | Clock Config Doc |
-| --- | --- | --- |
-| <img src=".github/images/img4.png" alt="Retrieval Code" width="100%"> | <img src=".github/images/img5.png" alt="Exam Clock" width="100%"> | <img src=".github/images/img6.png" alt="Clock Config Doc" width="100%"> |
+## Screenshots
 
-## Use Cases
+### Pickup and sending
 
-  * **Temporary File Transfer**: Quickly transfer files between different devices without the need to log in or install heavy applications.
-  * **Code Snippet Sharing**: Share code snippets, configuration files, or logs with colleagues or friends.
-  * **Online Exam Timing**: Provide a precise, unified network countdown clock for online exams or simulated tests.
-  * **Temporary Link Sharing**: Convert complex long links into concise short links for easy sharing on social media or messaging apps.
+<p align="center">
+  <img src=".github/images/img1.png" alt="ClipBox pickup home" width="100%">
+</p>
 
-## Technical Stack
+<p align="center">
+  <img src=".github/images/img2.png" alt="ClipBox send file" width="100%">
+</p>
 
-  * **Backend**: Flask, Flask-SQLAlchemy
-  * **Database**: MySQL (connected via PyMySQL)
-  * **Frontend**: Native HTML, CSS, JavaScript
-  * **Others**: NTP
+### File details and sending history
 
-## Quick Start
+<p align="center">
+  <img src=".github/images/img3.png" alt="ClipBox file details" width="100%">
+</p>
 
-### Environment Requirements
+<p align="center">
+  <img src=".github/images/img4.png" alt="ClipBox sending history" width="100%">
+</p>
 
-  * Python 3.x
-  * MySQL
+## Quick start
 
-### Local Development
+Requirements: Go 1.23+ and Node.js 20+. SQLite is the default, so no database server is required.
 
-1.  **Clone the Repository**:
+```bash
+cd frontend
+npm ci
+npm run build
+cd ..
+go run .
+```
 
-    ```bash
-    git clone https://github.com/MeTerminator/ClipBox.git
-    cd clipbox
-    ```
+The first start creates `data/config.json` and the SQLite database at `data/clipbox.db`. ClipBox listens on `http://127.0.0.1:5328` by default. For frontend development, run `npm run dev` in `frontend/`; Vite proxies `/clip`, `/file`, and `/text` to the Go server.
 
-2.  **Install Dependencies**:
+## Configuration
 
-    ```bash
-    pip install -r requirements.txt
-    ```
+Configuration is stored in `data/config.json`. The default database settings are:
 
-3.  **Configure the Application**:
+```json
+{
+  "database": {
+    "driver": "sqlite",
+    "dsn": "data/clipbox.db"
+  }
+}
+```
 
-      * Modify the database connection information and other configurations in `app/config.py` as prompted.
+To use MySQL, change `driver` to `mysql`, set `dsn` to a Go MySQL DSN such as `root:password@tcp(127.0.0.1:3306)/clipbox?charset=utf8mb4`, and restart the service. The complete configuration and defaults are written on first start; see [.env.example](.env.example) for optional environment overrides.
 
-4.  **Run the Application**:
+## Upload API
 
-    ```bash
-    python main.py
-    ```
+1. `POST /clip/upload/init` with JSON `{filename,size,sha1,count,expire}`. The response includes the server chunk size, worker count, and the indexes already uploaded.
+2. Upload missing raw chunks concurrently with `PUT /clip/upload/<sha1>/<chunk-index>`.
+3. `POST /clip/upload/<sha1>/complete` with JSON `{filename,count,expire}`.
 
-    The application will be running at `http://127.0.0.1:5328`.
+The default chunk size is 4 MiB, concurrency is 4, and the resume window is 10 minutes. These can be changed using the environment variables documented in [.env.example](.env.example).
 
-## Deployment Guide
+## Test
 
-For stable operation in a production environment, it is recommended to use a WSGI server for deployment.
-
-### Option 1: Gunicorn (for Linux/macOS)
-
-1.  Install Gunicorn:
-
-    ```bash
-    pip install gunicorn
-    ```
-
-2.  Run the Application:
-
-    ```bash
-    gunicorn -w 4 -b 0.0.0.0:5328 'app:create_app()'
-    ```
-
-      * `-w 4`: Starts 4 worker processes.
-      * `-b 0.0.0.0:5328`: Binds to port 5328 on all network interfaces.
-
-### Option 2: Waitress (for Windows)
-
-1.  Install Waitress:
-
-    ```bash
-    pip install waitress
-    ```
-
-2.  Create a `run.py` file:
-
-    ```python
-    from waitress import serve
-    from app import create_app
-
-    app = create_app()
-
-    if __name__ == '__main__':
-        serve(app, host='0.0.0.0', port=5328)
-    ```
-
-3.  Run the Application:
-
-    ```bash
-    python run.py
-    ```
-
-## Contribution Guide
-
-We welcome contributions in any form\!
-
-  * **Report Bugs**: If you find a bug, please submit the details through [GitHub Issues](https://github.com/MeTerminator/ClipBox/issues).
-  * **Feature Suggestions**: If you have ideas for new features, feel free to propose them via Issues.
-  * **Code Contribution**: Please follow these steps:
-    1.  Fork this repository.
-    2.  Create your feature branch (`git checkout -b feature/AmazingFeature`).
-    3.  Commit your changes (`git commit -m 'Add some AmazingFeature'`).
-    4.  Push to the branch (`git push origin feature/AmazingFeature`).
-    5.  Open a Pull Request.
+```bash
+go test ./...
+cd frontend && npm run build
+```
 
 ## License
 
-This project is open-sourced under the [MIT License](https://github.com/MeTerminator/ClipBox/blob/main/LICENSE).
-
-[](https://www.star-history.com/#MeTerminator/ClipBox&Date)
-
-----
-
-  - [MeT-Home](https://met6.top/) - MeTerminator's Homepage.
+[MIT](LICENSE)

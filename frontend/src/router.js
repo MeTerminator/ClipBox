@@ -3,8 +3,8 @@ import Home from './views/Home.vue'
 import Clip from './views/Clip.vue'
 
 const routes = [
-  { path: '/', component: Home },
-  { path: '/create', component: Clip },
+  { path: '/', name: 'home', component: Home },
+  { path: '/create', name: 'create', component: Clip },
   { path: '/clip', redirect: '/create' },
 ]
 

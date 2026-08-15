@@ -40,19 +40,19 @@ const props = defineProps({
   <Sonner
     :class="cn('toaster group', props.class)"
     :style="{
-      '--normal-bg': 'var(--popover)',
-      '--normal-text': 'var(--popover-foreground)',
-      '--normal-border': 'var(--border)',
-      '--border-radius': 'var(--radius)',
+      '--normal-bg': 'hsl(var(--popover))',
+      '--normal-text': 'hsl(var(--popover-foreground))',
+      '--normal-border': 'hsl(var(--border) / 0.18)',
+      '--border-radius': '0px',
       '--gray2': 'hsl(var(--popover) / 0.9)',
-      '--gray3': 'var(--border)',
-      '--gray4': 'var(--border)',
-      '--gray5': 'var(--border)',
-      '--gray12': 'var(--popover-foreground)',
+      '--gray3': 'hsl(var(--border) / 0.18)',
+      '--gray4': 'hsl(var(--border) / 0.28)',
+      '--gray5': 'hsl(var(--border) / 0.4)',
+      '--gray12': 'hsl(var(--popover-foreground))',
     }"
     :toast-options="{
       classes: {
-        toast: 'rounded-2xl',
+        toast: 'rounded-none',
       },
     }"
     v-bind="props"

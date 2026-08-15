@@ -2,9 +2,9 @@
   <Card class="border border-border bg-card shadow-none p-6 animate-in fade-in duration-200">
     <!-- Header Back Link -->
     <div class="mb-6">
-      <router-link to="/" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+      <router-link :to="{ name: 'home' }" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
         <ArrowLeftIcon class="h-4 w-4" />
-        {{ $t('clip.backToHome') || 'Back' }}
+        {{ $t('clip.backToHome') }}
       </router-link>
     </div>
 
@@ -68,13 +68,32 @@
               </div>
               <div class="text-sm">
                 <p v-if="!selectedFile" class="font-medium text-foreground">
-                  Drag & Drop or Click to select
+                  {{ $t('clip.dropFile') }}
                 </p>
                 <p v-else class="font-bold text-foreground">
                   {{ selectedFile.name }} ({{ formatSize(selectedFile.size) }})
                 </p>
               </div>
             </div>
+          </div>
+          <div v-if="uploadStage" class="space-y-2" aria-live="polite">
+            <div class="flex justify-between text-xs text-muted-foreground">
+              <span>
+                {{ uploadStage === 'hashing'
+                  ? $t('clip.hashing', { progress: uploadProgress })
+                  : $t('clip.uploading', { progress: uploadProgress }) }}
+              </span>
+              <span>{{ uploadProgress }}%</span>
+            </div>
+            <div class="h-2 overflow-hidden rounded-full bg-muted">
+              <div
+                class="h-full bg-foreground transition-[width] duration-200"
+                :style="{ width: `${uploadProgress}%` }"
+              />
+            </div>
+            <p v-if="resumedChunks" class="text-xs text-muted-foreground">
+              {{ $t('clip.resuming', { count: resumedChunks }) }}
+            </p>
           </div>
         </div>
 
@@ -138,25 +157,6 @@
         </div>
       </div>
 
-      <!-- Result Code Box -->
-      <div v-if="resultCode" class="mt-6 p-4 border border-border bg-transparent rounded-lg flex items-center justify-between gap-4">
-        <span class="text-sm font-semibold text-foreground flex items-center gap-1">
-          {{ $t('clip.success') }}
-          <a :href="`/clip/${resultCode}`" target="_blank" class="underline hover:text-foreground/80 font-mono font-bold">
-            {{ resultCode }}
-          </a>
-        </span>
-        <Button 
-          @click="copyCode(resultCode)" 
-          size="sm" 
-          variant="outline" 
-          class="gap-1.5 border-border bg-transparent hover:bg-foreground hover:text-background"
-        >
-          <CopyIcon class="h-3.5 w-3.5" />
-          {{ $t('clip.copy') }}
-        </Button>
-      </div>
-
       <!-- Error Message Box -->
       <div v-if="errorMsg" class="mt-6 p-4 border border-destructive bg-transparent rounded-lg text-sm text-destructive">
         {{ $t('clip.error') }}{{ errorMsg }}
@@ -185,33 +185,44 @@
           :key="item.code" 
           class="flex items-center justify-between p-3 rounded-lg border border-border bg-transparent hover:border-foreground transition-colors"
         >
-          <div class="flex items-center gap-3 overflow-hidden">
+          <div class="flex w-full items-center gap-3 overflow-hidden">
             <span class="text-muted-foreground shrink-0">
               <component :is="getIconComponent(item.type)" class="h-4 w-4" />
             </span>
-            <a :href="`/clip/${item.code}`" target="_blank" class="font-bold font-mono text-foreground hover:underline hover:text-foreground/80 flex items-center gap-1 shrink-0">
+            <button type="button" class="font-bold font-mono text-foreground hover:underline hover:text-foreground/80 flex items-center gap-1 shrink-0" @click="openHistoryItem(item)">
               {{ item.code }}
               <ExternalLinkIcon class="h-3 w-3 text-muted-foreground" />
-            </a>
+            </button>
             <span class="text-xs text-muted-foreground shrink-0">({{ $t(`clip.${item.type}`) }})</span>
             <span v-if="item.filename" class="text-xs text-muted-foreground font-medium truncate max-w-[150px] sm:max-w-[300px]">
               - {{ item.filename }}
+            </span>
+            <span v-if="item.remainingCount !== undefined" class="ml-auto shrink-0 text-xs text-muted-foreground">
+              {{ $t('home.remainingCount') }} {{ item.remainingCount }}
             </span>
           </div>
         </li>
       </ul>
       <div v-else class="text-center py-12 border border-dashed rounded-lg border-border/60 text-muted-foreground text-sm">
-        No history yet.
+        {{ $t('clip.noHistory') }}
       </div>
     </div>
   </Card>
+
+  <FileDetailModal
+    :open="detailModalOpen"
+    :item="detailItem"
+    @close="detailModalOpen = false"
+    @copied="toast.success(t('clip.copied'))"
+  />
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Card } from '@/components/ui/card'
+import FileDetailModal from '@/components/FileDetailModal.vue'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -219,10 +230,10 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'vue-sonner'
+import CryptoJS from 'crypto-js'
 import { 
   ArrowLeftIcon, 
   UploadCloudIcon, 
-  CopyIcon, 
   Trash2Icon, 
   FileTextIcon, 
   LinkIcon, 
@@ -234,24 +245,35 @@ import {
 const route = useRoute()
 const { t } = useI18n()
 
-const activeTab = ref('text')
+const activeTab = ref(route.query.tab === 'file' ? 'file' : 'text')
 const formData = ref({
   content: '',
-  count: 1000000000,
-  expire: 10,
-  expireUnit: '31536000'
+  count: 1000,
+  expire: 1,
+  expireUnit: '86400'
 })
 const selectedFile = ref(null)
 const dragover = ref(false)
 const loading = ref(false)
-const resultCode = ref('')
 const errorMsg = ref('')
 const pendingRedirect = ref(null)
 const history = ref([])
+const detailModalOpen = ref(false)
+const detailItem = ref(null)
 const fileInput = ref(null)
+const uploadStage = ref('')
+const uploadProgress = ref(0)
+const resumedChunks = ref(0)
+
+const HASH_CHUNK_SIZE = 4 * 1024 * 1024
+const MAX_CHUNK_RETRIES = 3
 
 onMounted(() => {
   history.value = JSON.parse(localStorage.getItem('clipHistory') || '[]')
+})
+
+watch(() => route.query.tab, (tab) => {
+  if (tab === 'file') activeTab.value = 'file'
 })
 
 const formatSize = (bytes) => {
@@ -264,50 +286,151 @@ const formatSize = (bytes) => {
 
 const handleFileSelect = (e) => {
   selectedFile.value = e.target.files[0]
+  resetUploadProgress()
 }
 
 const handleDrop = (e) => {
   dragover.value = false
   if (e.dataTransfer.files.length) {
     selectedFile.value = e.dataTransfer.files[0]
+    resetUploadProgress()
   }
+}
+
+const resetUploadProgress = () => {
+  uploadStage.value = ''
+  uploadProgress.value = 0
+  resumedChunks.value = 0
+}
+
+const calculateSHA1 = async (file) => {
+  uploadStage.value = 'hashing'
+  uploadProgress.value = 0
+  const hasher = CryptoJS.algo.SHA1.create()
+  const totalChunks = Math.max(1, Math.ceil(file.size / HASH_CHUNK_SIZE))
+
+  if (file.size === 0) {
+    hasher.update(CryptoJS.lib.WordArray.create())
+    uploadProgress.value = 100
+  } else {
+    for (let index = 0; index < totalChunks; index += 1) {
+      const start = index * HASH_CHUNK_SIZE
+      const buffer = await file.slice(start, Math.min(start + HASH_CHUNK_SIZE, file.size)).arrayBuffer()
+      hasher.update(CryptoJS.lib.WordArray.create(buffer))
+      uploadProgress.value = Math.round(((index + 1) / totalChunks) * 100)
+      await new Promise(resolve => setTimeout(resolve, 0))
+    }
+  }
+
+  return hasher.finalize().toString(CryptoJS.enc.Hex)
+}
+
+const requestJSON = async (url, options) => {
+  const response = await fetch(url, options)
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    if (response.status === 404) throw new Error(t('home.notFound'))
+    if (response.status === 413) throw new Error(t('clip.fileTooLarge'))
+    if (response.status === 400 || response.status === 422) throw new Error(t('clip.invalidRequest'))
+    throw new Error(t('common.requestFailed', { status: response.status }))
+  }
+  return data
+}
+
+const uploadChunkWithRetry = async (uploadID, index, blob) => {
+  let lastError
+  for (let attempt = 1; attempt <= MAX_CHUNK_RETRIES; attempt += 1) {
+    try {
+      await requestJSON(`/clip/upload/${uploadID}/${index}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: blob
+      })
+      return
+    } catch (error) {
+      lastError = error
+      if (attempt < MAX_CHUNK_RETRIES) {
+        await new Promise(resolve => setTimeout(resolve, attempt * 400))
+      }
+    }
+  }
+  throw lastError
+}
+
+const uploadSelectedFile = async (file, count, expire) => {
+  const sha1 = await calculateSHA1(file)
+  const init = await requestJSON('/clip/upload/init', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename: file.name, size: file.size, sha1, count, expire })
+  })
+
+  if (init.instant_upload) return init
+
+  uploadStage.value = 'uploading'
+  resumedChunks.value = init.uploaded_chunks.length
+  const uploaded = new Set(init.uploaded_chunks)
+  const remaining = Array.from({ length: init.total_chunks }, (_, index) => index)
+    .filter(index => !uploaded.has(index))
+  let completed = uploaded.size
+  uploadProgress.value = init.total_chunks === 0
+    ? 100
+    : Math.round((completed / init.total_chunks) * 100)
+
+  let cursor = 0
+  const worker = async () => {
+    while (cursor < remaining.length) {
+      const index = remaining[cursor]
+      cursor += 1
+      const start = index * init.chunk_size
+      const chunk = file.slice(start, Math.min(start + init.chunk_size, file.size))
+      await uploadChunkWithRetry(init.upload_id, index, chunk)
+      completed += 1
+      uploadProgress.value = Math.round((completed / init.total_chunks) * 100)
+    }
+  }
+  const workerCount = Math.max(1, Math.min(init.workers || 4, remaining.length || 1))
+  await Promise.all(Array.from({ length: workerCount }, () => worker()))
+
+  return requestJSON(`/clip/upload/${init.upload_id}/complete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename: file.name, count, expire })
+  })
 }
 
 const submitClip = async () => {
   loading.value = true
-  resultCode.value = ''
   errorMsg.value = ''
 
   try {
-    const fd = new FormData()
-    fd.append('count', formData.value.count)
-    fd.append('expire', formData.value.expire * parseInt(formData.value.expireUnit))
-
-    let url = '/clip/create'
+    const count = Number(formData.value.count)
+    const expire = Number(formData.value.expire) * parseInt(formData.value.expireUnit)
+    let data
 
     if (activeTab.value === 'file') {
       if (!selectedFile.value) {
-        errorMsg.value = 'Please select a file'
+        errorMsg.value = t('clip.selectFileRequired')
         loading.value = false
         return
       }
-      fd.append('file', selectedFile.value)
-      url = '/clip/upload'
+      data = await uploadSelectedFile(selectedFile.value, count, expire)
     } else {
+      const fd = new FormData()
+      fd.append('count', count)
+      fd.append('expire', expire)
       fd.append('content', formData.value.content)
       fd.append('link', activeTab.value === 'link' ? 'yes' : 'no')
+      data = await requestJSON('/clip/create', { method: 'POST', body: fd })
     }
 
-    const res = await fetch(url, {
-      method: 'POST',
-      body: fd
-    })
-
-    const data = await res.json()
-    if (res.ok && data.code) {
-      resultCode.value = data.code
-      addToHistory(data.code, activeTab.value, selectedFile.value?.name)
-      toast.success(t('clip.success') + data.code)
+    if (data.code) {
+      const filename = selectedFile.value?.name || ''
+      const size = selectedFile.value?.size || 0
+      const expiresAt = new Date(Date.now() + expire * 1000).toISOString()
+      addToHistory(data.code, activeTab.value, filename, size, expiresAt, count)
+      detailItem.value = { code: data.code, type: activeTab.value, filename, size, expiresAt, remainingCount: count, maxCount: count }
+      detailModalOpen.value = true
 
       // Handle redirect
       const redirectUrl = route.query.redirect
@@ -319,12 +442,13 @@ const submitClip = async () => {
 
       formData.value.content = ''
       selectedFile.value = null
+      resetUploadProgress()
     } else {
-      errorMsg.value = data.error || 'Failed to create clip'
+      errorMsg.value = t('clip.createFailed')
       toast.error(errorMsg.value)
     }
   } catch (err) {
-    errorMsg.value = err.message
+    errorMsg.value = err instanceof TypeError ? t('common.networkError') : (err.message || t('common.unexpectedError'))
     toast.error(errorMsg.value)
   } finally {
     loading.value = false
@@ -345,8 +469,8 @@ const doRedirect = () => {
   }
 }
 
-const addToHistory = (code, type, filename = '') => {
-  const entry = { code, type, filename }
+const addToHistory = (code, type, filename = '', size = 0, expiresAt = '', maxCount = 0) => {
+  const entry = { code, type, filename, size, expiresAt, remainingCount: maxCount, maxCount }
   history.value.unshift(entry)
   if (history.value.length > 10) history.value.pop()
   localStorage.setItem('clipHistory', JSON.stringify(history.value))
@@ -355,15 +479,29 @@ const addToHistory = (code, type, filename = '') => {
 const clearHistory = () => {
   history.value = []
   localStorage.removeItem('clipHistory')
-  toast.success('History cleared')
+  toast.success(t('clip.historyCleared'))
 }
 
-const copyCode = async (code) => {
+const openHistoryItem = async (item) => {
   try {
-    await navigator.clipboard.writeText(code)
-    toast.success(t('clip.copied') || 'Copied!')
-  } catch (e) {
-    toast.error('Failed to copy')
+    const info = await requestJSON(`/clip/${item.code}/info`)
+    const refreshed = {
+      ...item,
+      type: info.type === 'text/plain' ? 'text' : info.type,
+      filename: info.filename || item.filename || '',
+      size: info.size ?? item.size ?? 0,
+      expiresAt: info.expires_at,
+      remainingCount: info.remaining_count,
+      maxCount: info.max_count,
+      expired: info.expired,
+    }
+    detailItem.value = refreshed
+    const index = history.value.findIndex(entry => entry.code === item.code)
+    if (index !== -1) history.value[index] = refreshed
+    localStorage.setItem('clipHistory', JSON.stringify(history.value))
+    detailModalOpen.value = true
+  } catch (error) {
+    toast.error(error instanceof TypeError ? t('common.networkError') : (error.message || t('common.unexpectedError')))
   }
 }
 
