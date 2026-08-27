@@ -28,6 +28,7 @@ type Manifest struct {
 	Version     int       `json:"version"`
 	ID          string    `json:"id"`
 	SHA1        string    `json:"sha1"`
+	Filename    string    `json:"filename"`
 	Size        int64     `json:"size"`
 	ChunkSize   int64     `json:"chunk_size"`
 	TotalChunks int       `json:"total_chunks"`
@@ -77,8 +78,8 @@ func ValidSHA1(value string) bool {
 	return err == nil && value == strings.ToLower(value)
 }
 
-func (m *Manager) Init(hash string, size int64, now time.Time) (*Status, error) {
-	if !ValidSHA1(hash) || size < 0 || size > m.maxSize {
+func (m *Manager) Init(hash, filename string, size int64, now time.Time) (*Status, error) {
+	if !ValidSHA1(hash) || !validFilename(filename) || size < 0 || size > m.maxSize {
 		return nil, ErrInvalidUpload
 	}
 	unlock := m.exclusiveLock(hash)
@@ -112,6 +113,7 @@ func (m *Manager) Init(hash string, size int64, now time.Time) (*Status, error) 
 			Version:     1,
 			ID:          hash,
 			SHA1:        hash,
+			Filename:    filename,
 			Size:        size,
 			ChunkSize:   m.chunkSize,
 			TotalChunks: totalChunks,
@@ -248,7 +250,7 @@ func (m *Manager) Complete(hash string, now time.Time) (string, int64, error) {
 		return "", 0, ErrHashMismatch
 	}
 
-	finalPath := m.FilePath(hash)
+	finalPath := m.FilePath(manifest.Filename, hash)
 	if existing, statErr := os.Stat(finalPath); statErr == nil {
 		if existing.Size() != copied {
 			return "", 0, fmt.Errorf("stored SHA1 path has unexpected size")
@@ -269,8 +271,47 @@ func (m *Manager) Complete(hash string, now time.Time) (string, int64, error) {
 	return finalPath, copied, nil
 }
 
-func (m *Manager) FilePath(hash string) string {
-	return filepath.Join(m.filesRoot, hash)
+func (m *Manager) FilePath(filename, hash string) string {
+	extension := filepath.Ext(filename)
+	stem := strings.TrimSuffix(filename, extension)
+	if stem == "" {
+		stem = filename
+		extension = ""
+	}
+	return filepath.Join(m.filesRoot, stem+"_"+hash+extension)
+}
+
+// FindStoredFile locates bytes already stored for a SHA1. This also recognizes
+// the legacy path format, where the filename was the bare SHA1.
+func (m *Manager) FindStoredFile(hash string, size int64) (string, bool, error) {
+	if !ValidSHA1(hash) || size < 0 {
+		return "", false, ErrInvalidUpload
+	}
+	entries, err := os.ReadDir(m.filesRoot)
+	if err != nil {
+		return "", false, err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !storedFilenameMatches(entry.Name(), hash) {
+			continue
+		}
+		path := filepath.Join(m.filesRoot, entry.Name())
+		info, statErr := entry.Info()
+		if statErr != nil {
+			return "", false, statErr
+		}
+		if !info.Mode().IsRegular() || info.Size() != size {
+			continue
+		}
+		storedHash, hashErr := hashFile(path)
+		if hashErr != nil {
+			return "", false, hashErr
+		}
+		if storedHash == hash {
+			return path, true, nil
+		}
+	}
+	return "", false, nil
 }
 
 func (m *Manager) CleanupExpired(now time.Time) (int, error) {
@@ -346,7 +387,7 @@ func (m *Manager) readManifest(hash string) (*Manifest, error) {
 	if err := json.Unmarshal(payload, &manifest); err != nil {
 		return nil, err
 	}
-	if manifest.ID != hash || manifest.SHA1 != hash || manifest.ChunkSize <= 0 || manifest.Size < 0 {
+	if manifest.ID != hash || manifest.SHA1 != hash || !validFilename(manifest.Filename) || manifest.ChunkSize <= 0 || manifest.Size < 0 {
 		return nil, ErrInvalidUpload
 	}
 	return &manifest, nil
@@ -468,6 +509,18 @@ func hashFile(path string) (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(hasher.Sum(nil)), nil
+}
+
+func validFilename(filename string) bool {
+	return filename != "" && filename != "." && filename != ".." && filename == filepath.Base(filename)
+}
+
+func storedFilenameMatches(filename, hash string) bool {
+	if filename == hash {
+		return true
+	}
+	extension := filepath.Ext(filename)
+	return strings.HasSuffix(strings.TrimSuffix(filename, extension), "_"+hash)
 }
 
 func ParseChunkIndex(raw string) (int, error) {

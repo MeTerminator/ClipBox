@@ -42,7 +42,7 @@ func TestChunkUploadResumesAndCompletes(t *testing.T) {
 	hash := digest(payload)
 	now := time.Now()
 
-	status, err := manager.Init(hash, int64(len(payload)), now)
+	status, err := manager.Init(hash, "sample.txt", int64(len(payload)), now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func TestChunkUploadResumesAndCompletes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resumed, err := manager.Init(hash, int64(len(payload)), now.Add(3*time.Second))
+	resumed, err := manager.Init(hash, "sample.txt", int64(len(payload)), now.Add(3*time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,6 +81,18 @@ func TestChunkUploadResumesAndCompletes(t *testing.T) {
 	if !bytes.Equal(stored, payload) {
 		t.Fatalf("stored payload differs: %q", stored)
 	}
+	wantName := "sample_" + hash + ".txt"
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Name() != wantName {
+		t.Fatalf("stored filename = %q; want %q", info.Name(), wantName)
+	}
+	reusedPath, found, err := manager.FindStoredFile(hash, int64(len(payload)))
+	if err != nil || !found || reusedPath != path {
+		t.Fatalf("FindStoredFile() = %q, %v, %v; want existing path %q", reusedPath, found, err, path)
+	}
 	if _, err := os.Stat(manager.sessionDir(hash)); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("completed temporary session still exists: %v", err)
 	}
@@ -94,7 +106,7 @@ func TestExpiredUploadIsRemoved(t *testing.T) {
 	payload := []byte("partial upload")
 	hash := digest(payload)
 	now := time.Now()
-	if _, err := manager.Init(hash, int64(len(payload)), now); err != nil {
+	if _, err := manager.Init(hash, "partial.bin", int64(len(payload)), now); err != nil {
 		t.Fatal(err)
 	}
 	removed, err := manager.CleanupExpired(now.Add(11 * time.Minute))
@@ -117,7 +129,7 @@ func TestHashMismatchClearsChunksForRetry(t *testing.T) {
 	payload := []byte("expected")
 	hash := digest(payload)
 	now := time.Now()
-	status, err := manager.Init(hash, int64(len(payload)), now)
+	status, err := manager.Init(hash, "expected.bin", int64(len(payload)), now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +161,7 @@ func TestDifferentChunksAreWrittenConcurrently(t *testing.T) {
 	payload := []byte("abcdefgh")
 	hash := digest(payload)
 	now := time.Now()
-	if _, err := manager.Init(hash, int64(len(payload)), now); err != nil {
+	if _, err := manager.Init(hash, "concurrent.bin", int64(len(payload)), now); err != nil {
 		t.Fatal(err)
 	}
 

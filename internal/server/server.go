@@ -309,9 +309,12 @@ func (s *Server) initUpload(c *gin.Context) {
 			}
 		}
 	}
-	canonicalPath := s.uploads.FilePath(request.SHA1)
-	if info, statErr := os.Stat(canonicalPath); statErr == nil && info.Mode().IsRegular() && info.Size() == request.Size {
-		clip := s.fileClip(request.Filename, canonicalPath, request.SHA1, request.Size, count, expire, c)
+	storedPath, found, findErr := s.uploads.FindStoredFile(request.SHA1, request.Size)
+	if findErr != nil {
+		slog.Error("find stored upload", "sha1", request.SHA1, "error", findErr)
+	}
+	if found {
+		clip := s.fileClip(request.Filename, storedPath, request.SHA1, request.Size, count, expire, c)
 		if createErr := s.createWithCode(c.Request.Context(), clip); createErr != nil {
 			jsonError(c, http.StatusInternalServerError, "Database error")
 			return
@@ -320,7 +323,7 @@ func (s *Server) initUpload(c *gin.Context) {
 		return
 	}
 
-	status, err := s.uploads.Init(request.SHA1, request.Size, s.now())
+	status, err := s.uploads.Init(request.SHA1, request.Filename, request.Size, s.now())
 	if err != nil {
 		s.writeUploadError(c, err)
 		return

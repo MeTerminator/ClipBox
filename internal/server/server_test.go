@@ -421,6 +421,38 @@ func TestChunkUploadHTTPFlow(t *testing.T) {
 	if download.Code != http.StatusOK || !bytes.Equal(download.Body.Bytes(), payload) {
 		t.Fatalf("download status = %d, body = %q", download.Code, download.Body.Bytes())
 	}
+	storedPath := filepath.Join(dataDir, "files", "sample_"+hash+".txt")
+	info, err := os.Stat(storedPath)
+	if err != nil {
+		t.Fatalf("named local file was not stored at %q: %v", storedPath, err)
+	}
+	if !info.Mode().IsRegular() {
+		t.Fatalf("named local path is not a regular file: %q", storedPath)
+	}
+
+	repeatedResponse := performJSONRequest(t, application.Handler(), http.MethodPost, "/clip/upload/init", map[string]any{
+		"filename": "renamed.txt", "size": len(payload), "sha1": hash, "count": 2, "expire": 3600,
+	})
+	if repeatedResponse.Code != http.StatusOK {
+		t.Fatalf("repeated init status = %d, body = %s", repeatedResponse.Code, repeatedResponse.Body.String())
+	}
+	var repeated struct {
+		Code          string `json:"code"`
+		InstantUpload bool   `json:"instant_upload"`
+	}
+	if err := json.Unmarshal(repeatedResponse.Body.Bytes(), &repeated); err != nil {
+		t.Fatal(err)
+	}
+	if !repeated.InstantUpload || len(repeated.Code) != 5 {
+		t.Fatalf("repeated upload did not reuse stored bytes: %#v", repeated)
+	}
+	if reused := database.clips[repeated.Code]; reused == nil || reused.File == nil || reused.File.Path != storedPath {
+		t.Fatalf("repeated upload path = %#v; want %q", reused, storedPath)
+	}
+	entries, err := os.ReadDir(filepath.Join(dataDir, "files"))
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("stored files after repeated upload = %d, %v; want 1", len(entries), err)
+	}
 }
 
 func performRequest(handler http.Handler, method, target string, body io.Reader) *httptest.ResponseRecorder {

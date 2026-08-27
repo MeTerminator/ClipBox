@@ -14,7 +14,7 @@ ClipBox is a small temporary sharing service for files, text, and links. A five-
 - Text pickup codes redirect to `/text/<text-sha1>`.
 - Link pickup codes keep the original behavior and redirect straight to the destination URL.
 - Files are uploaded in parallel chunks. Incomplete chunks are kept under `data/tmp/<sha1>` and can be resumed for 10 minutes.
-- The server verifies the complete file SHA1 before moving it into `data/files/<sha1>`.
+- The server verifies the complete file SHA1 before storing it as `data/files/<original-name>_<sha1><extension>`. Repeated content reuses the existing local file.
 - Database access uses GORM. File metadata lives in a separate `cb_files` table linked from `cb_clips.file_id`.
 - New content defaults to 1,000 accesses and expires after one day. The server automatically removes expired records and unreferenced files every minute.
 - Existing `cb_clips` tables are migrated automatically, including legacy file records and missing SHA1 values.
