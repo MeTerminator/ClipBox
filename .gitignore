@@ -54,6 +54,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+frontend/src-tauri/target/
+frontend/src-tauri/gen/
 *.local
 
 # Editor directories and files

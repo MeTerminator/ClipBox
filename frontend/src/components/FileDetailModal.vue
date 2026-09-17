@@ -75,6 +75,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { ClipRecord } from "@/types";
+import { backendOrigin } from "@/lib/backend";
 
 const props = withDefaults(defineProps<{ open?: boolean; item?: ClipRecord | null }>(), {
   open: false,
@@ -86,7 +87,7 @@ const qrDataUrl = ref("");
 const copied = ref(false);
 
 const pickupLink = computed(() =>
-  props.item?.code ? `${window.location.origin}/clip/${props.item.code}` : "",
+  props.item?.code ? `${backendOrigin}/clip/${props.item.code}` : "",
 );
 const typeLabel = computed(() => t(`clip.${props.item?.type === "text/plain" ? "text" : props.item?.type || "file"}`));
 

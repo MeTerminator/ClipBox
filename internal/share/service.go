@@ -72,11 +72,14 @@ func (s *Service) SendMessage(ctx context.Context, room *model.ShareRoom, member
 	if input.Source != model.MessageSourceUI && input.Source != model.MessageSourceClipboard {
 		return nil, ErrInvalidMessage
 	}
+	if input.Source == model.MessageSourceClipboard && input.Kind != model.RoomMessageText {
+		return nil, ErrInvalidMessage
+	}
 	message := &model.RoomMessage{RoomID: room.ID, MemberID: member.ID, Kind: input.Kind, Source: input.Source, CreatedAt: s.now()}
 	switch input.Kind {
 	case model.RoomMessageText:
-		message.Text = strings.TrimSpace(input.Text)
-		if message.Text == "" || int64(len([]byte(message.Text))) > s.maxTextSize {
+		message.Text = input.Text
+		if strings.TrimSpace(message.Text) == "" || int64(len([]byte(message.Text))) > s.maxTextSize {
 			return nil, ErrInvalidMessage
 		}
 	case model.RoomMessageFile:

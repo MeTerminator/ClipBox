@@ -6,7 +6,9 @@
     "dev": "vite",
     "typecheck": "vue-tsc --build --force",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "tauri build"
   },
   "dependencies": {
     "@lucide/vue": "^1.47.0",
@@ -24,6 +26,8 @@
     "vue-sonner": "^2.0.9"
   },
   "devDependencies": {
+    "@tauri-apps/api": "^2.8.0",
+    "@tauri-apps/cli": "^2.8.4",
     "@tailwindcss/postcss": "^4.3.1",
     "@tailwindcss/vite": "^4.3.3",
     "@types/crypto-js": "^4.2.2",
@@ -36,6 +40,7 @@
     "tailwindcss": "^4.3.1",
     "typescript": "^5.9.3",
     "vite": "^8.0.10",
+    "vite-plugin-pwa": "^1.0.3",
     "vue-tsc": "^3.3.11"
   }
 }

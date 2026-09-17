@@ -19,7 +19,7 @@ ClipBox 是一个轻量的临时文件、文本和链接分享服务。用户通
 - 新内容默认最多访问 1000 次、1 天后过期；服务端每分钟自动删除过期记录及无引用文件。
 - 现有 `cb_clips` 会自动迁移，旧文件记录和缺失的 SHA1 会在启动时回填。
 - 分享房间支持多个浏览器交换文本和文件，并以昵称、设备、系统和浏览器展示成员信息。
-- 房间消息将载荷 `kind`（`text` / `file`）与来源 `source`（`user` / `clipboard`）分开，后续剪贴板同步可直接复用同一 API。
+- 房间消息将载荷 `kind`（`text` / `file`）与来源 `source`（`user` / `clipboard`）分开；桌面客户端仅通过复制/粘贴快捷键同步纯文本。
 
 ## 技术栈
 
@@ -65,6 +65,27 @@ go run .
 
 首次启动会生成 `data/config.json` 和 SQLite 数据库 `data/clipbox.db`。SQLite 使用纯 Go 驱动，因此 GitHub Actions 打包的 `CGO_ENABLED=0` 二进制也可以直接使用 SQLite。默认监听 `http://127.0.0.1:5328`。前端开发时可在 `frontend/` 中运行 `npm run dev`；Vite 会把 `/clip`、`/file` 和 `/text` 代理到 Go 服务。
 
+## 桌面客户端
+
+客户端使用 Tauri 2，复用系统 WebView，支持 Windows、macOS 和 Linux（X11）。关闭主窗口后会继续驻留系统托盘，点击托盘图标可重新打开。
+
+```bash
+cd frontend
+npm install
+npm run desktop:dev
+
+# 连接远程 ClipBox 服务并生成当前平台安装包
+VITE_API_ORIGIN=https://clipbox.example.com npm run desktop:build
+```
+
+- Windows/Linux 使用 `Ctrl+C`、`Ctrl+V`，macOS 使用 `Command+C`、`Command+V`。客户端监听按键但不占用系统快捷键。
+- 复制快捷键完成后，客户端只在剪贴板是纯文本且当前分享房间在线时上传；右键菜单、应用菜单、脚本或剪贴板历史工具造成的变化不会上传，图片与文件也不会上传。
+- 收到的最近一条远端剪贴板文本只缓存在客户端内；按下粘贴快捷键时才写入系统剪贴板，避免仅因收到消息就修改本机剪贴板。
+- macOS 首次使用需要在“系统设置 → 隐私与安全性 → 辅助功能”授权。Linux 的全局按键监听依赖 X11；Wayland 出于安全模型限制，当前版本不支持全局快捷键，可在 XWayland/X11 会话使用。
+- 不设置 `VITE_API_ORIGIN` 时桌面客户端默认连接 `http://127.0.0.1:5328`。这项值在打包时写入前端，请使用实际 HTTPS 服务地址发布安装包。
+
+客户端的快捷键监听、托盘与粘贴行为需要在三个真实系统上分别验证；单平台编译成功不能替代跨平台安装和权限验证。
+
 ## 配置
 
 配置保存在 `data/config.json`。默认数据库配置为：
@@ -96,7 +117,7 @@ go run .
 - 房间接口使用 `Authorization: Bearer <member-token>`；服务端只保存令牌的 SHA-256 摘要。
 - `GET /api/rooms/:roomID/messages?after=<id>` 用于断线重连后恢复已持久化的历史消息。
 - `GET /api/rooms/:roomID/ws` 建立实时通道；客户端首帧必须为 `{"type":"auth","token":"..."}`，发送消息使用 `{"type":"send","message":{kind,source,...}}`。
-- 文本载荷为 `{kind:"text",source,text}`；文件先复用现有上传接口，再发送 `{kind:"file",source,file_code}`。
+- 文本载荷为 `{kind:"text",source,text}`；文件先复用现有上传接口，再发送 `{kind:"file",source:"user",file_code}`。当前服务端拒绝 `source:"clipboard"` 的非文本消息。
 - `DELETE /api/rooms/:roomID` 仅允许房间创建者调用。
 
 ## 发布版本

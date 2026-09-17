@@ -1,5 +1,6 @@
 import { ref } from "vue";
 import CryptoJS from "crypto-js";
+import { backendURL } from "@/lib/backend";
 
 const HASH_CHUNK_SIZE = 4 * 1024 * 1024;
 const MAX_CHUNK_RETRIES = 3;
@@ -36,7 +37,7 @@ class RequestError extends Error {
 }
 
 async function requestJSON<T>(url: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(url, options);
+  const response = await fetch(backendURL(url), options);
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   if (!response.ok) {
     throw new RequestError(

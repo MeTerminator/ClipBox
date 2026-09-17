@@ -19,7 +19,7 @@ ClipBox is a small temporary sharing service for files, text, and links. A five-
 - New content defaults to 1,000 accesses and expires after one day. The server automatically removes expired records and unreferenced files every minute.
 - Existing `cb_clips` tables are migrated automatically, including legacy file records and missing SHA1 values.
 - Share rooms let multiple browsers exchange text and files while showing readable nickname, device, OS, and browser presence.
-- Room messages separate payload `kind` (`text`/`file`) from `source` (`user`/`clipboard`) so clipboard sync can reuse the same API.
+- Room messages separate payload `kind` (`text`/`file`) from `source` (`user`/`clipboard`); the desktop client only syncs plain text through copy/paste shortcuts.
 
 ## Stack
 
@@ -65,6 +65,20 @@ go run .
 
 The first start creates `data/config.json` and the SQLite database at `data/clipbox.db`. SQLite uses a pure-Go driver, so the release binaries also work with `CGO_ENABLED=0`. ClipBox listens on `http://127.0.0.1:5328` by default. For frontend development, run `npm run dev` in `frontend/`; Vite proxies `/clip`, `/file`, and `/text` to the Go server.
 
+## Desktop client
+
+The Tauri 2 client uses the operating system WebView on Windows, macOS, and Linux (X11). Closing its main window keeps it in the system tray; click the tray icon to reopen it.
+
+```bash
+cd frontend
+npm install
+npm run desktop:dev
+
+VITE_API_ORIGIN=https://clipbox.example.com npm run desktop:build
+```
+
+Windows/Linux use `Ctrl+C` and `Ctrl+V`; macOS uses `Command+C` and `Command+V`. Only a real keyboard shortcut triggers synchronization. Copy uploads only plain text while a sharing room is connected; menu/automation clipboard changes, images, and files are ignored. Received clipboard text stays in the client until the paste shortcut writes it to the system clipboard. macOS requires Accessibility permission. The global listener supports Linux X11, not native Wayland. Without `VITE_API_ORIGIN`, desktop builds connect to `http://127.0.0.1:5328`.
+
 ## Configuration
 
 Configuration is stored in `data/config.json`. The default database settings are:
@@ -96,7 +110,7 @@ The default chunk size is 4 MiB, concurrency is 4, and the resume window is 10 m
 - Room calls use `Authorization: Bearer <member-token>`. Only a SHA-256 token digest is stored by the server.
 - `GET /api/rooms/:roomID/messages?after=<id>` restores persisted history after reconnecting.
 - `GET /api/rooms/:roomID/ws` opens the real-time channel. The first client frame must be `{"type":"auth","token":"..."}`; messages are sent as `{"type":"send","message":{kind,source,...}}`.
-- Text uses `{kind:"text",source,text}`; files use `{kind:"file",source,file_code}` after reusing the existing upload API.
+- Text uses `{kind:"text",source,text}`; files use `{kind:"file",source:"user",file_code}` after reusing the existing upload API. The server rejects non-text messages with `source:"clipboard"`.
 - `DELETE /api/rooms/:roomID` is restricted to the room creator.
 
 ## Releases

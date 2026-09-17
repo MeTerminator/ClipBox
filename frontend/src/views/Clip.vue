@@ -273,6 +273,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "vue-sonner";
 import { useFileUpload } from "@/composables/useFileUpload";
+import { backendURL } from "@/lib/backend";
 import type { ClipKind, ClipRecord } from "@/types";
 import {
   ArrowLeftIcon,
@@ -341,7 +342,7 @@ const requestJSON = async <T extends Record<string, unknown> = Record<string, un
   url: string,
   options?: RequestInit,
 ): Promise<T> => {
-  const response = await fetch(url, options);
+  const response = await fetch(backendURL(url), options);
   const data = (await response.json().catch(() => ({}))) as T;
   if (!response.ok) {
     if (response.status === 404) throw new Error(t("home.notFound"));

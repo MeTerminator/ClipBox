@@ -89,4 +89,4 @@ Authorization: Bearer <token>
 {"type":"send","message":{"kind":"file","source":"user","file_code":"12345"}}
 ```
 
-`source` 可为 `user` 或 `clipboard`。服务端事件包括 `ready`、`message`、`presence`、`room_updated`、`room_deleted`、`pong` 和 `error`。消息先持久化再广播，断线后可用历史接口补齐。
+`source` 可为 `user` 或 `clipboard`。当前剪贴板协议只接受 `kind:"text"`；以 `source:"clipboard"` 发送文件会被服务端拒绝。服务端事件包括 `ready`、`message`、`presence`、`room_updated`、`room_deleted`、`pong` 和 `error`。消息先持久化再广播，断线后可用历史接口补齐。

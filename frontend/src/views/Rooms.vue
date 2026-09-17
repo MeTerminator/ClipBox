@@ -126,6 +126,8 @@ import { useI18n } from "vue-i18n";
 import { toast } from "vue-sonner";
 import { useFileUpload } from "@/composables/useFileUpload";
 import { setRoomFileDropHandler } from "@/composables/fileDropTarget";
+import { backendOrigin, backendURL, backendWebSocketURL } from "@/lib/backend";
+import { isDesktopClient, listenForDesktopCopies, setDesktopSharedText } from "@/lib/desktop";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -161,6 +163,7 @@ let socket: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 let pingTimer: ReturnType<typeof setInterval> | undefined;
 let intentionalClose = false;
+let stopDesktopCopyListener: (() => void) | undefined;
 const me = computed(() => session.value?.room.members.find((member) => member.id === session.value?.room.current_member_id));
 
 function errorMessage(error: unknown) { return error instanceof Error ? error.message : t("rooms.unknownError"); }
@@ -180,7 +183,7 @@ function deviceInfo() {
 async function request<T>(url: string, options: RequestInit = {}, token = session.value?.token): Promise<T> {
   const headers = new Headers(options.headers);
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  const response = await fetch(url, { ...options, headers });
+  const response = await fetch(backendURL(url), { ...options, headers });
   if (!response.ok) { const body = await response.json().catch(() => ({})) as { error?: string }; throw new HTTPError(body.error || t("rooms.unknownError"), response.status); }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
@@ -192,8 +195,7 @@ async function openSavedRoom(room: SavedRoom) { busy.value = true; try { activat
 function connectSocket() {
   if (!session.value) return;
   connected.value = false; intentionalClose = false;
-  const scheme = location.protocol === "https:" ? "wss" : "ws";
-  const connection = socket = new WebSocket(`${scheme}://${location.host}/api/rooms/${session.value.room.id}/ws`);
+  const connection = socket = new WebSocket(backendWebSocketURL(`/api/rooms/${session.value.room.id}/ws`));
   connection.addEventListener("open", () => { connection.send(JSON.stringify({ type: "auth", token: session.value?.token })); clearInterval(pingTimer); pingTimer = setInterval(() => sendSocket({ type: "ping" }), 20000); });
   connection.addEventListener("message", (event) => void handleSocketEvent(event));
   connection.addEventListener("close", () => { if (connection !== socket) return; connected.value = false; clearInterval(pingTimer); if (!intentionalClose && session.value) { clearTimeout(reconnectTimer); reconnectTimer = setTimeout(connectSocket, 1500); } });
@@ -201,8 +203,8 @@ function connectSocket() {
 }
 async function handleSocketEvent(event: MessageEvent<string>) {
   let data: Record<string, unknown>; try { data = JSON.parse(event.data) as Record<string, unknown>; } catch { return; }
-  if (data.type === "ready") { connected.value = true; if (session.value) session.value.room = data.room as RoomInfo; messages.value = (data.messages as RoomMessage[]) || []; await scrollBottom(); }
-  else if (data.type === "message") { const message = data.message as RoomMessage; if (!messages.value.some((item) => item.id === message.id)) messages.value.push(message); await scrollBottom(); }
+  if (data.type === "ready") { connected.value = true; if (session.value) session.value.room = data.room as RoomInfo; messages.value = (data.messages as RoomMessage[]) || []; const latestClipboard = [...messages.value].reverse().find((message) => message.kind === "text" && message.source === "clipboard"); await setDesktopSharedText(latestClipboard?.text || null); await scrollBottom(); }
+  else if (data.type === "message") { const message = data.message as RoomMessage; if (!messages.value.some((item) => item.id === message.id)) messages.value.push(message); if (message.kind === "text" && message.source === "clipboard") await setDesktopSharedText(message.text); await scrollBottom(); }
   else if (data.type === "presence" && session.value) session.value.room.members = (data.members as RoomInfo["members"]) || [];
   else if (data.type === "room_updated" && session.value) { session.value.room.name = String(data.name || ""); saveSession(session.value); }
   else if (data.type === "room_deleted") { toast.error(t("rooms.roomNotFound")); leaveRoom(); }
@@ -213,8 +215,8 @@ function sendMessage(payload: object) { sendSocket({ type: "send", message: payl
 function sendText() { const text = draft.value.trim(); if (!text || busy.value) return; try { sendMessage({ kind: "text", source: "user", text }); draft.value = ""; } catch (error) { toast.error(errorMessage(error)); } }
 async function processRoomFile(file: File) { if (busy.value) return; if (!connected.value) { toast.error(t("rooms.unknownError")); return; } busy.value = true; resetUploadProgress(); try { const result = await uploadFile(file, { count: 1000, expire: 31536000 }); sendMessage({ kind: "file", source: "user", file_code: result.code }); } catch (error) { toast.error(errorMessage(error)); } finally { busy.value = false; resetUploadProgress(); } }
 async function sendFile(event: Event) { const input = event.target as HTMLInputElement; const file = input.files?.[0]; input.value = ""; if (file) await processRoomFile(file); }
-async function downloadFile(message: RoomMessage) { if (!message.file || !session.value) return; try { const response = await fetch(message.file.download_url, { headers: { Authorization: `Bearer ${session.value.token}` } }); if (!response.ok) throw new Error(t("rooms.unknownError")); const url = URL.createObjectURL(await response.blob()); const link = document.createElement("a"); link.href = url; link.download = message.file.name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); } catch (error) { toast.error(errorMessage(error)); } }
-async function copyInvite() { if (!session.value) return; await navigator.clipboard.writeText(`${location.origin}/rooms/${session.value.room.id}`); toast.success(t("rooms.copied")); }
+async function downloadFile(message: RoomMessage) { if (!message.file || !session.value) return; try { const response = await fetch(backendURL(message.file.download_url), { headers: { Authorization: `Bearer ${session.value.token}` } }); if (!response.ok) throw new Error(t("rooms.unknownError")); const url = URL.createObjectURL(await response.blob()); const link = document.createElement("a"); link.href = url; link.download = message.file.name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); } catch (error) { toast.error(errorMessage(error)); } }
+async function copyInvite() { if (!session.value) return; await navigator.clipboard.writeText(`${backendOrigin}/rooms/${session.value.room.id}`); toast.success(t("rooms.copied")); }
 async function copyRoomID() { if (!session.value) return; await navigator.clipboard.writeText(session.value.room.id); toast.success(t("rooms.roomIDCopied")); }
 async function deleteRoom() { if (!session.value) return; try { await request<void>(`/api/rooms/${session.value.room.id}`, { method: "DELETE" }); leaveRoom(); } catch (error) { toast.error(error instanceof HTTPError && error.status === 403 ? t("rooms.onlyOwner") : errorMessage(error)); } }
 function startEditingName() { roomNameDraft.value = session.value?.room.name || ""; editingName.value = true; }
@@ -226,6 +228,13 @@ function formatTime(value: string) { return new Intl.DateTimeFormat(undefined, {
 async function scrollBottom() { await nextTick(); const viewport = document.querySelector<HTMLElement>("[data-slot='scroll-area-viewport']"); if (viewport) viewport.scrollTop = viewport.scrollHeight; }
 watch(() => createForm.name, (name) => localStorage.setItem("lastRoomName", name));
 watch(session, (value) => setRoomFileDropHandler(value ? processRoomFile : null), { immediate: true });
-onMounted(() => { const id = String(route.params.roomID || ""); const saved = savedRooms.value.find((room) => room.id === id); if (saved) void openSavedRoom(saved); });
-onBeforeUnmount(() => { setRoomFileDropHandler(null); closeSocket(); });
+onMounted(async () => {
+  const id = String(route.params.roomID || ""); const saved = savedRooms.value.find((room) => room.id === id); if (saved) void openSavedRoom(saved);
+  stopDesktopCopyListener = await listenForDesktopCopies((text) => {
+    if (!connected.value || !session.value || !text.trim()) return;
+    try { void setDesktopSharedText(text).catch(() => undefined); sendMessage({ kind: "text", source: "clipboard", text }); } catch (error) { toast.error(errorMessage(error)); }
+  });
+  if (isDesktopClient()) toast.info(t("rooms.desktopClipboardReady"));
+});
+onBeforeUnmount(() => { stopDesktopCopyListener?.(); void setDesktopSharedText(null); setRoomFileDropHandler(null); closeSocket(); });
 </script>

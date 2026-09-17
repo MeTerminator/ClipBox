@@ -94,6 +94,7 @@ import { Input } from "@/components/ui/input";
 import PickupHistoryModal from "@/components/PickupHistoryModal.vue";
 import PickupResultModal from "@/components/PickupResultModal.vue";
 import type { ClipRecord } from "@/types";
+import { backendURL } from "@/lib/backend";
 
 const { t } = useI18n();
 const digits = ref<string[]>(["", "", "", "", ""]);
@@ -175,7 +176,7 @@ const pickup = async () => {
   if (loading.value) return;
   loading.value = true;
   try {
-    const response = await fetch(`/clip/${code}/resolve`, {
+    const response = await fetch(backendURL(`/clip/${code}/resolve`), {
       method: "POST",
       headers: { Accept: "application/json" },
     });
