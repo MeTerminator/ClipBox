@@ -18,6 +18,8 @@ ClipBox is a small temporary sharing service for files, text, and links. A five-
 - Database access uses GORM. File metadata lives in a separate `cb_files` table linked from `cb_clips.file_id`.
 - New content defaults to 1,000 accesses and expires after one day. The server automatically removes expired records and unreferenced files every minute.
 - Existing `cb_clips` tables are migrated automatically, including legacy file records and missing SHA1 values.
+- Share rooms let multiple browsers exchange text and files while showing readable nickname, device, OS, and browser presence.
+- Room messages separate payload `kind` (`text`/`file`) from `source` (`user`/`clipboard`) so clipboard sync can reuse the same API.
 
 ## Stack
 
@@ -83,6 +85,17 @@ To use MySQL, change `driver` to `mysql`, set `dsn` to a Go MySQL DSN such as `r
 3. `POST /clip/upload/<sha1>/complete` with JSON `{filename,count,expire}`.
 
 The default chunk size is 4 MiB, concurrency is 4, and the resume window is 10 minutes. These can be changed using the environment variables documented in [.env.example](.env.example).
+
+## Share room API
+
+- `POST /api/rooms` creates a room; `POST /api/rooms/:roomID/join` joins it.
+- Room IDs are eight digits. Names are optional and can later be changed by the creator with `PATCH /api/rooms/:roomID`.
+- Rooms are ephemeral: the last WebSocket disconnect deletes the room, and background cleanup removes abandoned rooms that never established a connection.
+- Room calls use `Authorization: Bearer <member-token>`. Only a SHA-256 token digest is stored by the server.
+- `GET /api/rooms/:roomID/messages?after=<id>` restores persisted history after reconnecting.
+- `GET /api/rooms/:roomID/ws` opens the real-time channel. The first client frame must be `{"type":"auth","token":"..."}`; messages are sent as `{"type":"send","message":{kind,source,...}}`.
+- Text uses `{kind:"text",source,text}`; files use `{kind:"file",source,file_code}` after reusing the existing upload API.
+- `DELETE /api/rooms/:roomID` is restricted to the room creator.
 
 ## Releases
 

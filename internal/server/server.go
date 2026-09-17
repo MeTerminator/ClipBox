@@ -21,6 +21,7 @@ import (
 
 	"github.com/MeTerminator/ClipBox/internal/config"
 	"github.com/MeTerminator/ClipBox/internal/model"
+	"github.com/MeTerminator/ClipBox/internal/share"
 	"github.com/MeTerminator/ClipBox/internal/store"
 	"github.com/MeTerminator/ClipBox/internal/upload"
 	"github.com/gin-gonic/gin"
@@ -32,6 +33,9 @@ type Server struct {
 	uploads *upload.Manager
 	router  *gin.Engine
 	now     func() time.Time
+	rooms   store.RoomStore
+	sharing *share.Service
+	hub     *share.Hub
 }
 
 type uploadInitRequest struct {
@@ -55,6 +59,11 @@ func New(cfg config.Config, database store.Store, uploads *upload.Manager) *Serv
 		uploads: uploads,
 		now:     func() time.Time { return time.Now().UTC() },
 	}
+	if rooms, ok := database.(store.RoomStore); ok {
+		server.rooms = rooms
+		server.sharing = share.NewService(rooms, cfg.MaxTextSize, func() time.Time { return server.now() })
+		server.hub = share.NewHub()
+	}
 	router := gin.New()
 	router.Use(gin.Logger(), gin.Recovery(), server.cors())
 
@@ -68,6 +77,14 @@ func New(cfg config.Config, database store.Store, uploads *upload.Manager) *Serv
 	router.GET("/clip/:code", server.getClip)
 	router.GET("/file/:sha1/*filename", server.getFile)
 	router.GET("/text/:sha1", server.getText)
+	router.POST("/api/rooms", server.createRoom)
+	router.POST("/api/rooms/:roomID/join", server.joinRoom)
+	router.GET("/api/rooms/:roomID", server.getRoom)
+	router.PATCH("/api/rooms/:roomID", server.renameRoom)
+	router.DELETE("/api/rooms/:roomID", server.deleteRoom)
+	router.GET("/api/rooms/:roomID/messages", server.listRoomMessages)
+	router.GET("/api/rooms/:roomID/ws", server.roomWebSocket)
+	router.GET("/api/rooms/:roomID/messages/:messageID/file", server.downloadRoomFile)
 
 	server.registerFrontend(router)
 	server.router = router
@@ -79,8 +96,8 @@ func (s *Server) Handler() http.Handler { return s.router }
 func (s *Server) cors() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Content-Type, X-Requested-With")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Requested-With")
 		if c.Request.Method == http.MethodOptions {
 			c.AbortWithStatus(http.StatusNoContent)
 			return
@@ -419,6 +436,7 @@ func (s *Server) RunCleanup(ctx context.Context) {
 		if expired > 0 || removedFiles > 0 {
 			slog.Info("cleaned expired clips", "clips", expired, "files", removedFiles)
 		}
+		s.cleanupEmptyRooms(ctx, now.UTC())
 	}
 	run(s.now())
 	ticker := time.NewTicker(time.Minute)
@@ -429,6 +447,26 @@ func (s *Server) RunCleanup(ctx context.Context) {
 			return
 		case now := <-ticker.C:
 			run(now)
+		}
+	}
+}
+
+func (s *Server) cleanupEmptyRooms(ctx context.Context, now time.Time) {
+	if s.rooms == nil || s.hub == nil {
+		return
+	}
+	rooms, err := s.rooms.ListRooms(ctx)
+	if err != nil {
+		slog.Error("list empty share rooms", "error", err)
+		return
+	}
+	for _, room := range rooms {
+		// Allow the create response enough time to establish its first socket.
+		if now.Sub(room.CreatedAt) < 30*time.Second || s.hub.OnlineCount(room.ID) != 0 {
+			continue
+		}
+		if err := s.rooms.DeleteRoom(ctx, room.ID); err != nil && !errors.Is(err, store.ErrNotFound) {
+			slog.Error("delete empty share room", "room_id", room.PublicID, "error", err)
 		}
 	}
 }
@@ -520,7 +558,7 @@ func (s *Server) registerFrontend(router *gin.Engine) {
 	}
 	router.NoRoute(func(c *gin.Context) {
 		path := c.Request.URL.Path
-		if strings.HasPrefix(path, "/clip/") || strings.HasPrefix(path, "/file/") || strings.HasPrefix(path, "/text/") {
+		if strings.HasPrefix(path, "/api/") || strings.HasPrefix(path, "/clip/") || strings.HasPrefix(path, "/file/") || strings.HasPrefix(path, "/text/") {
 			jsonError(c, http.StatusNotFound, "Not found")
 			return
 		}

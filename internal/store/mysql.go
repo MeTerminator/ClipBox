@@ -103,7 +103,7 @@ func (s *GORMStore) Close() error {
 
 func (s *GORMStore) migrate(ctx context.Context) error {
 	db := s.db.WithContext(ctx)
-	if err := db.AutoMigrate(&model.File{}, &model.Clip{}); err != nil {
+	if err := db.AutoMigrate(&model.File{}, &model.Clip{}, &model.ShareRoom{}, &model.RoomMember{}, &model.RoomMessage{}); err != nil {
 		return fmt.Errorf("migrate database schema: %w", err)
 	}
 	if err := s.backfillTextSHA1(ctx); err != nil {
@@ -367,6 +367,11 @@ func (s *GORMStore) CleanupExpired(ctx context.Context, now time.Time) ([]string
 			if err := tx.Model(&model.Clip{}).Where("file_id = ?", fileID).Count(&references).Error; err != nil {
 				return err
 			}
+			if references == 0 {
+				if err := tx.Model(&model.RoomMessage{}).Where("file_id = ?", fileID).Count(&references).Error; err != nil {
+					return err
+				}
+			}
 			if references != 0 {
 				continue
 			}
@@ -406,6 +411,17 @@ func (s *GORMStore) CountFileReferences(ctx context.Context, path string, now ti
 		if !clip.Expired(now) {
 			count++
 		}
+	}
+	var fileIDs []int64
+	if err := s.db.WithContext(ctx).Model(&model.File{}).Where("path = ?", path).Pluck("id", &fileIDs).Error; err != nil {
+		return 0, err
+	}
+	if len(fileIDs) > 0 {
+		var messageReferences int64
+		if err := s.db.WithContext(ctx).Model(&model.RoomMessage{}).Where("file_id IN ?", fileIDs).Count(&messageReferences).Error; err != nil {
+			return 0, err
+		}
+		count += int(messageReferences)
 	}
 	return count, nil
 }

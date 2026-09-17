@@ -1,16 +1,22 @@
 <template>
-  <section class="pickup-page animate-in fade-in slide-in-from-bottom-4 duration-500">
+  <section
+    class="pickup-page animate-in fade-in slide-in-from-bottom-4 duration-500"
+  >
     <div class="pickup-heading">
-      <h1>{{ $t('home.pickupTitle') }}</h1>
-      <p>{{ $t('home.pickupSubtitle') }}</p>
+      <h1>{{ $t("home.pickupTitle") }}</h1>
+      <p>{{ $t("home.pickupSubtitle") }}</p>
     </div>
 
     <form @submit.prevent="pickup" class="pickup-form">
-      <div class="pickup-code-grid" role="group" :aria-label="$t('home.pickupCode')">
+      <div
+        class="pickup-code-grid"
+        role="group"
+        :aria-label="$t('home.pickupCode')"
+      >
         <input
           v-for="(_, index) in digits"
           :key="index"
-          :ref="element => setInputRef(element, index)"
+          :ref="(element) => setInputRef(element, index)"
           v-model="digits[index]"
           inputmode="numeric"
           autocomplete="one-time-code"
@@ -25,18 +31,32 @@
 
       <Button type="submit" class="pickup-submit" :disabled="loading">
         <CloudDownloadIcon class="h-5 w-5" />
-        {{ loading ? $t('home.loading') : $t('home.pickupBtn') }}
+        {{ loading ? $t("home.loading") : $t("home.pickupBtn") }}
       </Button>
 
       <div class="pickup-actions">
-        <router-link :to="{ name: 'create', query: { tab: 'file' } }" class="pickup-secondary-action">
+        <router-link
+          :to="{ name: 'create', query: { tab: 'file' } }"
+          class="pickup-secondary-action"
+        >
           <UploadCloudIcon class="h-5 w-5" />
-          {{ $t('home.sendFile') }}
+          {{ $t("home.sendFile") }}
         </router-link>
-        <button type="button" class="pickup-secondary-action" @click="historyOpen = true">
+        <button
+          type="button"
+          class="pickup-secondary-action"
+          @click="historyOpen = true"
+        >
           <HistoryIcon class="h-5 w-5" />
-          {{ $t('home.pickupHistory') }}
+          {{ $t("home.pickupHistory") }}
         </button>
+        <router-link
+          :to="{ name: 'rooms' }"
+          class="pickup-secondary-action pickup-room-action"
+        >
+          <MessagesSquareIcon class="h-5 w-5" />
+          {{ $t("rooms.title") }}
+        </router-link>
       </div>
     </form>
   </section>
@@ -57,91 +77,113 @@
 </template>
 
 <script setup>
-import { nextTick, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { toast } from 'vue-sonner'
-import { CloudDownloadIcon, HistoryIcon, UploadCloudIcon } from 'lucide-vue-next'
-import { Button } from '@/components/ui/button'
-import PickupHistoryModal from '@/components/PickupHistoryModal.vue'
-import PickupResultModal from '@/components/PickupResultModal.vue'
+import { nextTick, ref } from "vue";
+import { useI18n } from "vue-i18n";
+import { toast } from "vue-sonner";
+import {
+  CloudDownloadIcon,
+  HistoryIcon,
+  MessagesSquareIcon,
+  UploadCloudIcon,
+} from "lucide-vue-next";
+import { Button } from "@/components/ui/button";
+import PickupHistoryModal from "@/components/PickupHistoryModal.vue";
+import PickupResultModal from "@/components/PickupResultModal.vue";
 
-const { t } = useI18n()
-const digits = ref(['', '', '', '', ''])
-const inputRefs = ref([])
-const loading = ref(false)
-const pickupResult = ref(null)
-const resultOpen = ref(false)
-const historyOpen = ref(false)
-const pickupHistory = ref(JSON.parse(localStorage.getItem('pickupHistory') || '[]'))
+const { t } = useI18n();
+const digits = ref(["", "", "", "", ""]);
+const inputRefs = ref([]);
+const loading = ref(false);
+const pickupResult = ref(null);
+const resultOpen = ref(false);
+const historyOpen = ref(false);
+const pickupHistory = ref(
+  JSON.parse(localStorage.getItem("pickupHistory") || "[]"),
+);
 
 const setInputRef = (element, index) => {
-  if (element) inputRefs.value[index] = element
-}
+  if (element) inputRefs.value[index] = element;
+};
 
 const handleInput = (index, event) => {
-  const value = event.target.value.replace(/\D/g, '').slice(-1)
-  digits.value[index] = value
+  const value = event.target.value.replace(/\D/g, "").slice(-1);
+  digits.value[index] = value;
   if (value && index < digits.value.length - 1) {
-    nextTick(() => inputRefs.value[index + 1]?.focus())
+    nextTick(() => inputRefs.value[index + 1]?.focus());
   } else if (value && index === digits.value.length - 1) {
-    nextTick(pickup)
+    nextTick(pickup);
   }
-}
+};
 
 const handleKeydown = (index, event) => {
-  if (event.key === 'Backspace' && !digits.value[index] && index > 0) {
-    digits.value[index - 1] = ''
-    nextTick(() => inputRefs.value[index - 1]?.focus())
+  if (event.key === "Backspace" && !digits.value[index] && index > 0) {
+    digits.value[index - 1] = "";
+    nextTick(() => inputRefs.value[index - 1]?.focus());
   }
-}
+};
 
 const handlePaste = (event) => {
-  event.preventDefault()
-  const pasted = event.clipboardData.getData('text').replace(/\D/g, '').slice(0, 5)
-  pasted.split('').forEach((digit, index) => { digits.value[index] = digit })
-  nextTick(() => inputRefs.value[Math.min(pasted.length, 4)]?.focus())
-  if (pasted.length === 5) nextTick(pickup)
-}
+  event.preventDefault();
+  const pasted = event.clipboardData
+    .getData("text")
+    .replace(/\D/g, "")
+    .slice(0, 5);
+  pasted.split("").forEach((digit, index) => {
+    digits.value[index] = digit;
+  });
+  nextTick(() => inputRefs.value[Math.min(pasted.length, 4)]?.focus());
+  if (pasted.length === 5) nextTick(pickup);
+};
 
 const pickup = async () => {
-  const code = digits.value.join('')
+  const code = digits.value.join("");
   if (!/^\d{5}$/.test(code)) {
-    toast.error(t('home.invalidCode'))
-    return
+    toast.error(t("home.invalidCode"));
+    return;
   }
-  if (loading.value) return
-  loading.value = true
+  if (loading.value) return;
+  loading.value = true;
   try {
     const response = await fetch(`/clip/${code}/resolve`, {
-      method: 'POST',
-      headers: { Accept: 'application/json' },
-    })
-    const data = await response.json().catch(() => ({}))
-    if (!response.ok) throw new Error(response.status === 404 ? t('home.notFound') : t('common.requestFailed', { status: response.status }))
-    pickupResult.value = data
-    const record = { ...data, retrievedAt: new Date().toISOString() }
-    pickupHistory.value = [record, ...pickupHistory.value.filter(item => item.code !== data.code)].slice(0, 10)
-    localStorage.setItem('pickupHistory', JSON.stringify(pickupHistory.value))
-    resultOpen.value = true
+      method: "POST",
+      headers: { Accept: "application/json" },
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok)
+      throw new Error(
+        response.status === 404
+          ? t("home.notFound")
+          : t("common.requestFailed", { status: response.status }),
+      );
+    pickupResult.value = data;
+    const record = { ...data, retrievedAt: new Date().toISOString() };
+    pickupHistory.value = [
+      record,
+      ...pickupHistory.value.filter((item) => item.code !== data.code),
+    ].slice(0, 10);
+    localStorage.setItem("pickupHistory", JSON.stringify(pickupHistory.value));
+    resultOpen.value = true;
   } catch (error) {
-    toast.error(error instanceof TypeError ? t('common.networkError') : error.message)
+    toast.error(
+      error instanceof TypeError ? t("common.networkError") : error.message,
+    );
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
-const openHistoryRecord = record => {
-  historyOpen.value = false
-  pickupResult.value = record
-  resultOpen.value = true
-}
+const openHistoryRecord = (record) => {
+  historyOpen.value = false;
+  pickupResult.value = record;
+  resultOpen.value = true;
+};
 
 const clearPickupHistory = () => {
-  pickupHistory.value = []
-  localStorage.removeItem('pickupHistory')
-  historyOpen.value = false
-  toast.success(t('home.pickupHistoryCleared'))
-}
+  pickupHistory.value = [];
+  localStorage.removeItem("pickupHistory");
+  historyOpen.value = false;
+  toast.success(t("home.pickupHistoryCleared"));
+};
 </script>
 
 <style scoped>
@@ -192,7 +234,9 @@ const clearPickupHistory = () => {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 2rem;
   font-weight: 700;
-  transition: border-color 160ms ease, background 160ms ease;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
 }
 
 .pickup-code-grid input:focus {
@@ -210,7 +254,10 @@ const clearPickupHistory = () => {
   color: hsl(var(--muted-foreground));
   font-size: 1rem;
   font-weight: 700;
-  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease;
 }
 
 .pickup-submit:not(:disabled):hover {
@@ -239,7 +286,10 @@ const clearPickupHistory = () => {
   font-weight: 650;
   text-decoration: none;
   background: transparent;
-  transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease;
 }
 
 .pickup-secondary-action:hover {
@@ -248,8 +298,18 @@ const clearPickupHistory = () => {
   color: hsl(var(--foreground));
 }
 
+.pickup-room-action {
+  grid-column: 1 / -1;
+}
+
 @media (max-width: 480px) {
-  .pickup-code-grid { gap: 0.5rem; }
-  .pickup-code-grid input { height: 68px; border-radius: 0.8rem; font-size: 1.65rem; }
+  .pickup-code-grid {
+    gap: 0.5rem;
+  }
+  .pickup-code-grid input {
+    height: 68px;
+    border-radius: 0.8rem;
+    font-size: 1.65rem;
+  }
 }
 </style>

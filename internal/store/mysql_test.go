@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -91,6 +92,39 @@ func TestOpenUsesSQLiteAndCreatesParentDirectory(t *testing.T) {
 	}
 	if info, err := os.Stat(path); err != nil || !info.Mode().IsRegular() {
 		t.Fatalf("SQLite database was not created at %s: %v", path, err)
+	}
+}
+
+func TestGORMStoreShareRoomLifecycle(t *testing.T) {
+	database := newSQLiteStore(t)
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	room := &model.ShareRoom{PublicID: "ROOM1234", Name: "My devices"}
+	owner := &model.RoomMember{TokenHash: strings.Repeat("a", 64), Nickname: "Laptop", Device: "Desktop", OS: "macOS", Browser: "Safari", LastSeenAt: now}
+	if err := database.CreateRoom(ctx, room, owner); err != nil {
+		t.Fatal(err)
+	}
+	if !owner.IsOwner || owner.RoomID != room.ID {
+		t.Fatalf("owner was not associated with room: %#v", owner)
+	}
+	phone := &model.RoomMember{TokenHash: strings.Repeat("b", 64), Nickname: "Phone", Device: "iPhone", OS: "iOS", Browser: "Safari", LastSeenAt: now}
+	joined, err := database.JoinRoom(ctx, room.PublicID, phone)
+	if err != nil || joined.ID != room.ID {
+		t.Fatalf("JoinRoom() = %#v, %v", joined, err)
+	}
+	message := &model.RoomMessage{RoomID: room.ID, MemberID: phone.ID, Kind: model.RoomMessageText, Source: model.MessageSourceClipboard, Text: "copied text", CreatedAt: now}
+	if err := database.CreateRoomMessage(ctx, message); err != nil {
+		t.Fatal(err)
+	}
+	messages, err := database.ListRoomMessages(ctx, room.ID, 0, 20)
+	if err != nil || len(messages) != 1 || messages[0].Member.Nickname != "Phone" || messages[0].Source != model.MessageSourceClipboard {
+		t.Fatalf("ListRoomMessages() = %#v, %v", messages, err)
+	}
+	if err := database.DeleteRoom(ctx, room.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.FindRoom(ctx, room.PublicID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("FindRoom() after delete error = %v, want ErrNotFound", err)
 	}
 }
 

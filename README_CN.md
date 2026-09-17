@@ -18,6 +18,8 @@ ClipBox 是一个轻量的临时文件、文本和链接分享服务。用户通
 - 数据库访问基于 GORM；文件元数据由独立的 `cb_files` 表管理，`cb_clips` 通过 `file_id` 关联。
 - 新内容默认最多访问 1000 次、1 天后过期；服务端每分钟自动删除过期记录及无引用文件。
 - 现有 `cb_clips` 会自动迁移，旧文件记录和缺失的 SHA1 会在启动时回填。
+- 分享房间支持多个浏览器交换文本和文件，并以昵称、设备、系统和浏览器展示成员信息。
+- 房间消息将载荷 `kind`（`text` / `file`）与来源 `source`（`user` / `clipboard`）分开，后续剪贴板同步可直接复用同一 API。
 
 ## 技术栈
 
@@ -83,6 +85,17 @@ go run .
 3. 使用 `POST /clip/upload/<sha1>/complete` 和 JSON `{filename,count,expire}` 完成上传。
 
 默认分片大小为 4 MiB、并发数为 4、断点保留时间为 10 分钟。可通过 [.env.example](.env.example) 中的环境变量调整。
+
+## 分享房间接口
+
+- `POST /api/rooms` 创建房间，`POST /api/rooms/:roomID/join` 加入房间。
+- 房间 ID 为 8 位数字；房间名称可留空，创建者之后可通过 `PATCH /api/rooms/:roomID` 修改。
+- 房间是临时的：最后一个 WebSocket 客户端断开后立即删除；从未成功建立连接的遗留房间由后台清理。
+- 房间接口使用 `Authorization: Bearer <member-token>`；服务端只保存令牌的 SHA-256 摘要。
+- `GET /api/rooms/:roomID/messages?after=<id>` 用于断线重连后恢复已持久化的历史消息。
+- `GET /api/rooms/:roomID/ws` 建立实时通道；客户端首帧必须为 `{"type":"auth","token":"..."}`，发送消息使用 `{"type":"send","message":{kind,source,...}}`。
+- 文本载荷为 `{kind:"text",source,text}`；文件先复用现有上传接口，再发送 `{kind:"file",source,file_code}`。
+- `DELETE /api/rooms/:roomID` 仅允许房间创建者调用。
 
 ## 发布版本
 
