@@ -18,6 +18,7 @@ var (
 	ErrForbidden      = errors.New("room operation is forbidden")
 )
 
+// MessageInput is the transport-neutral command for creating a room message.
 type MessageInput struct {
 	Kind     string `json:"kind"`
 	Source   string `json:"source"`
@@ -25,6 +26,7 @@ type MessageInput struct {
 	FileCode string `json:"file_code"`
 }
 
+// RenameRoom changes a room name when member owns the room.
 func (s *Service) RenameRoom(ctx context.Context, room *model.ShareRoom, member *model.RoomMember, name string) error {
 	if !member.IsOwner {
 		return ErrForbidden
@@ -40,10 +42,13 @@ type Service struct {
 	maxTextSize int64
 }
 
+// NewService constructs the room application service.
 func NewService(repository store.RoomStore, maxTextSize int64, now func() time.Time) *Service {
 	return &Service{store: repository, maxTextSize: maxTextSize, now: now}
 }
 
+// Authenticate resolves a public room and verifies a plaintext member token
+// against its persisted digest.
 func (s *Service) Authenticate(ctx context.Context, publicID, token string) (*model.ShareRoom, *model.RoomMember, error) {
 	room, err := s.store.FindRoom(ctx, strings.ToUpper(strings.TrimSpace(publicID)))
 	if err != nil {
@@ -57,6 +62,7 @@ func (s *Service) Authenticate(ctx context.Context, publicID, token string) (*mo
 	return room, member, nil
 }
 
+// SendMessage validates and persists a room message before it is broadcast.
 func (s *Service) SendMessage(ctx context.Context, room *model.ShareRoom, member *model.RoomMember, input MessageInput) (*model.RoomMessage, error) {
 	input.Kind = strings.ToLower(strings.TrimSpace(input.Kind))
 	input.Source = strings.ToLower(strings.TrimSpace(input.Source))
@@ -89,6 +95,7 @@ func (s *Service) SendMessage(ctx context.Context, room *model.ShareRoom, member
 	return message, nil
 }
 
+// TokenDigest returns the one-way representation persisted for member tokens.
 func TokenDigest(token string) string {
 	sum := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(sum[:])

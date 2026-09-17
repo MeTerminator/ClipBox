@@ -13,6 +13,7 @@ var (
 	ErrConflict = errors.New("clip code already exists")
 )
 
+// Store is the persistence port for pickup-code clips and their files.
 type Store interface {
 	Create(context.Context, *model.Clip) error
 	FindByCode(context.Context, string) (*model.Clip, error)

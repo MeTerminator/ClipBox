@@ -20,14 +20,20 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+// GORMStore persists ClipBox entities through GORM. It supports both SQLite
+// and MySQL.
 type GORMStore struct {
 	db *gorm.DB
 }
 
+// OpenMySQL opens a MySQL-backed store. Prefer Open when the driver is
+// selected from configuration.
 func OpenMySQL(ctx context.Context, dsn string) (*GORMStore, error) {
 	return open(ctx, "mysql", dsn)
 }
 
+// Open connects to the selected database, configures its pool, and migrates
+// the schema before returning.
 func Open(ctx context.Context, driver, dsn string) (*GORMStore, error) {
 	return open(ctx, strings.ToLower(strings.TrimSpace(driver)), strings.TrimSpace(dsn))
 }

@@ -5,6 +5,7 @@ import (
 	"sync"
 )
 
+// Client is one live room connection registered with a Hub.
 type Client struct {
 	RoomID   int64
 	MemberID int64
@@ -18,8 +19,10 @@ type Hub struct {
 	clients map[int64]map[*Client]struct{}
 }
 
+// NewHub creates an empty in-process room event hub.
 func NewHub() *Hub { return &Hub{clients: make(map[int64]map[*Client]struct{})} }
 
+// Register adds a live connection to its room.
 func (h *Hub) Register(client *Client) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -29,6 +32,7 @@ func (h *Hub) Register(client *Client) {
 	h.clients[client.RoomID][client] = struct{}{}
 }
 
+// Unregister removes a live connection from its room.
 func (h *Hub) Unregister(client *Client) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -39,6 +43,8 @@ func (h *Hub) Unregister(client *Client) {
 	}
 }
 
+// Broadcast offers an event to every live client in a room. It never blocks;
+// persisted history is the recovery path for a slow client.
 func (h *Hub) Broadcast(roomID int64, event any) {
 	payload, err := json.Marshal(event)
 	if err != nil {
@@ -55,6 +61,7 @@ func (h *Hub) Broadcast(roomID int64, event any) {
 	}
 }
 
+// IsOnline reports whether a member has a registered connection in the room.
 func (h *Hub) IsOnline(roomID, memberID int64) bool {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -66,6 +73,7 @@ func (h *Hub) IsOnline(roomID, memberID int64) bool {
 	return false
 }
 
+// OnlineCount returns the number of live connections in a room.
 func (h *Hub) OnlineCount(roomID int64) int {
 	h.mu.RLock()
 	defer h.mu.RUnlock()

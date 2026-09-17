@@ -8,6 +8,7 @@ const (
 	ContentFile = "file"
 )
 
+// Clip is a temporary pickup-code reference to text, a link, or a file.
 type Clip struct {
 	ID            int64     `gorm:"primaryKey;autoIncrement"`
 	Code          string    `gorm:"type:varchar(10);not null;uniqueIndex:idx_cb_clips_code"`
@@ -100,6 +101,7 @@ type RoomMessage struct {
 
 func (RoomMessage) TableName() string { return "cb_room_messages" }
 
+// Expired reports whether the clip is unusable at now due to its lifetime.
 func (clip Clip) Expired(now time.Time) bool {
 	return clip.CreatedAt.IsZero() || now.After(clip.CreatedAt.Add(time.Duration(clip.ExpireSeconds)*time.Second))
 }

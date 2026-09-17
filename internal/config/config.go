@@ -16,11 +16,13 @@ import (
 
 const defaultDataDir = "data"
 
+// Database selects the persistence driver and its driver-specific DSN.
 type Database struct {
 	Driver string `json:"driver"`
 	DSN    string `json:"dsn"`
 }
 
+// Config is the validated runtime configuration consumed by the application.
 type Config struct {
 	Address           string
 	Database          Database
@@ -49,6 +51,8 @@ type fileConfig struct {
 	UploadWorkers     int      `json:"upload_workers"`
 }
 
+// Load reads the configured JSON file, applies environment overrides, and
+// returns a validated configuration.
 func Load() (Config, error) {
 	_ = godotenv.Load()
 	dataDir := env("DATA_DIR", defaultDataDir)

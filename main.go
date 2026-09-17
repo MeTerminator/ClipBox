@@ -40,7 +40,11 @@ func main() {
 	}
 	go uploadManager.RunCleanup(ctx)
 
-	application := server.New(cfg, database, uploadManager)
+	application := server.NewWithDependencies(cfg, server.Dependencies{
+		Clips:   database,
+		Rooms:   database,
+		Uploads: uploadManager,
+	})
 	go application.RunCleanup(ctx)
 	httpServer := &http.Server{
 		Addr:              cfg.Address,

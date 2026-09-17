@@ -27,6 +27,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// Server adapts ClipBox application capabilities to HTTP and WebSocket APIs.
 type Server struct {
 	cfg     config.Config
 	store   store.Store
@@ -36,6 +37,16 @@ type Server struct {
 	rooms   store.RoomStore
 	sharing *share.Service
 	hub     *share.Hub
+}
+
+// Dependencies contains the infrastructure required by the HTTP transport.
+// Keeping construction explicit makes the composition root in main.go the
+// only place that knows which concrete database and upload implementations are
+// used. Tests can still provide small in-memory implementations.
+type Dependencies struct {
+	Clips   store.Store     // required
+	Rooms   store.RoomStore // optional
+	Uploads *upload.Manager // required
 }
 
 type uploadInitRequest struct {
@@ -52,46 +63,68 @@ type uploadCompleteRequest struct {
 	Expire   int    `json:"expire"`
 }
 
+// New builds a server from the legacy compact dependency list. New programs
+// should prefer NewWithDependencies so optional capabilities are visible at
+// the composition root.
 func New(cfg config.Config, database store.Store, uploads *upload.Manager) *Server {
+	dependencies := Dependencies{Clips: database, Uploads: uploads}
+	if rooms, ok := database.(store.RoomStore); ok {
+		dependencies.Rooms = rooms
+	}
+	return NewWithDependencies(cfg, dependencies)
+}
+
+// NewWithDependencies builds the HTTP transport and wires all routes. Room
+// sharing is optional; when Rooms is nil its endpoints return 501.
+func NewWithDependencies(cfg config.Config, dependencies Dependencies) *Server {
 	server := &Server{
 		cfg:     cfg,
-		store:   database,
-		uploads: uploads,
+		store:   dependencies.Clips,
+		uploads: dependencies.Uploads,
 		now:     func() time.Time { return time.Now().UTC() },
 	}
-	if rooms, ok := database.(store.RoomStore); ok {
-		server.rooms = rooms
-		server.sharing = share.NewService(rooms, cfg.MaxTextSize, func() time.Time { return server.now() })
+	if dependencies.Rooms != nil {
+		server.rooms = dependencies.Rooms
+		server.sharing = share.NewService(dependencies.Rooms, cfg.MaxTextSize, func() time.Time { return server.now() })
 		server.hub = share.NewHub()
 	}
 	router := gin.New()
 	router.Use(gin.Logger(), gin.Recovery(), server.cors())
-
-	router.POST("/clip/create", server.createClip)
-	router.POST("/clip/upload/init", server.initUpload)
-	router.GET("/clip/upload/:uploadID", server.uploadStatus)
-	router.PUT("/clip/upload/:uploadID/:chunk", server.uploadChunk)
-	router.POST("/clip/upload/:uploadID/complete", server.completeUpload)
-	router.GET("/clip/:code/info", server.getClipInfo)
-	router.POST("/clip/:code/resolve", server.resolveClip)
-	router.GET("/clip/:code", server.getClip)
-	router.GET("/file/:sha1/*filename", server.getFile)
-	router.GET("/text/:sha1", server.getText)
-	router.POST("/api/rooms", server.createRoom)
-	router.POST("/api/rooms/:roomID/join", server.joinRoom)
-	router.GET("/api/rooms/:roomID", server.getRoom)
-	router.PATCH("/api/rooms/:roomID", server.renameRoom)
-	router.DELETE("/api/rooms/:roomID", server.deleteRoom)
-	router.GET("/api/rooms/:roomID/messages", server.listRoomMessages)
-	router.GET("/api/rooms/:roomID/ws", server.roomWebSocket)
-	router.GET("/api/rooms/:roomID/messages/:messageID/file", server.downloadRoomFile)
-
+	server.registerRoutes(router)
 	server.registerFrontend(router)
 	server.router = router
 	return server
 }
 
+// Handler exposes the server as a standard net/http handler.
 func (s *Server) Handler() http.Handler { return s.router }
+
+func (s *Server) registerRoutes(router *gin.Engine) {
+	clips := router.Group("/clip")
+	clips.POST("/create", s.createClip)
+	clips.GET("/:code/info", s.getClipInfo)
+	clips.POST("/:code/resolve", s.resolveClip)
+	clips.GET("/:code", s.getClip)
+
+	uploads := clips.Group("/upload")
+	uploads.POST("/init", s.initUpload)
+	uploads.GET("/:uploadID", s.uploadStatus)
+	uploads.PUT("/:uploadID/:chunk", s.uploadChunk)
+	uploads.POST("/:uploadID/complete", s.completeUpload)
+
+	router.GET("/file/:sha1/*filename", s.getFile)
+	router.GET("/text/:sha1", s.getText)
+
+	rooms := router.Group("/api/rooms")
+	rooms.POST("", s.createRoom)
+	rooms.POST("/:roomID/join", s.joinRoom)
+	rooms.GET("/:roomID", s.getRoom)
+	rooms.PATCH("/:roomID", s.renameRoom)
+	rooms.DELETE("/:roomID", s.deleteRoom)
+	rooms.GET("/:roomID/messages", s.listRoomMessages)
+	rooms.GET("/:roomID/ws", s.roomWebSocket)
+	rooms.GET("/:roomID/messages/:messageID/file", s.downloadRoomFile)
+}
 
 func (s *Server) cors() gin.HandlerFunc {
 	return func(c *gin.Context) {

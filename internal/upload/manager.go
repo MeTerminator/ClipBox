@@ -24,6 +24,7 @@ var (
 	ErrHashMismatch  = errors.New("file SHA1 mismatch")
 )
 
+// Manifest is the durable metadata for an incomplete upload session.
 type Manifest struct {
 	Version     int       `json:"version"`
 	ID          string    `json:"id"`
@@ -35,12 +36,15 @@ type Manifest struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
+// Status describes resumable progress and the current expiry deadline.
 type Status struct {
 	Manifest
 	UploadedChunks []int     `json:"uploaded_chunks"`
 	ExpiresAt      time.Time `json:"expires_at"`
 }
 
+// Manager owns resumable upload sessions and permanent local file storage.
+// A per-digest lock serializes conflicting sessions within one process.
 type Manager struct {
 	tmpRoot   string
 	filesRoot string
@@ -52,6 +56,7 @@ type Manager struct {
 	locks   map[string]*sync.RWMutex
 }
 
+// NewManager prepares upload directories and returns a local-disk manager.
 func NewManager(dataDir string, chunkSize, maxSize int64, ttl time.Duration) (*Manager, error) {
 	manager := &Manager{
 		tmpRoot:   filepath.Join(dataDir, "tmp"),
@@ -70,6 +75,7 @@ func NewManager(dataDir string, chunkSize, maxSize int64, ttl time.Duration) (*M
 	return manager, nil
 }
 
+// ValidSHA1 reports whether value is a lowercase, 40-character SHA-1 digest.
 func ValidSHA1(value string) bool {
 	if len(value) != sha1.Size*2 {
 		return false
@@ -78,6 +84,8 @@ func ValidSHA1(value string) bool {
 	return err == nil && value == strings.ToLower(value)
 }
 
+// Init creates or resumes a session. An existing session keeps the filename
+// from its first request so the final physical path is deterministic.
 func (m *Manager) Init(hash, filename string, size int64, now time.Time) (*Status, error) {
 	if !ValidSHA1(hash) || !validFilename(filename) || size < 0 || size > m.maxSize {
 		return nil, ErrInvalidUpload
@@ -133,6 +141,7 @@ func (m *Manager) Init(hash, filename string, size int64, now time.Time) (*Statu
 	return m.statusLocked(manifest, now)
 }
 
+// Status returns current progress and refreshes session activity.
 func (m *Manager) Status(hash string, now time.Time) (*Status, error) {
 	if !ValidSHA1(hash) {
 		return nil, ErrInvalidUpload
@@ -149,6 +158,7 @@ func (m *Manager) Status(hash string, now time.Time) (*Status, error) {
 	return m.statusLocked(manifest, now)
 }
 
+// WriteChunk atomically replaces one exact-sized chunk in an active session.
 func (m *Manager) WriteChunk(hash string, index int, input io.Reader, now time.Time) error {
 	if !ValidSHA1(hash) {
 		return ErrInvalidUpload
@@ -193,6 +203,8 @@ func (m *Manager) WriteChunk(hash string, index int, input io.Reader, now time.T
 	return m.touch(hash, now)
 }
 
+// Complete assembles and verifies all chunks, then atomically publishes the
+// file. It returns the permanent path and verified size.
 func (m *Manager) Complete(hash string, now time.Time) (string, int64, error) {
 	if !ValidSHA1(hash) {
 		return "", 0, ErrInvalidUpload
@@ -271,6 +283,7 @@ func (m *Manager) Complete(hash string, now time.Time) (string, int64, error) {
 	return finalPath, copied, nil
 }
 
+// FilePath returns the permanent path for a sanitized filename and digest.
 func (m *Manager) FilePath(filename, hash string) string {
 	extension := filepath.Ext(filename)
 	stem := strings.TrimSuffix(filename, extension)
@@ -314,6 +327,7 @@ func (m *Manager) FindStoredFile(hash string, size int64) (string, bool, error) 
 	return "", false, nil
 }
 
+// CleanupExpired removes inactive temporary sessions.
 func (m *Manager) CleanupExpired(now time.Time) (int, error) {
 	entries, err := os.ReadDir(m.tmpRoot)
 	if err != nil {
@@ -342,6 +356,7 @@ func (m *Manager) CleanupExpired(now time.Time) (int, error) {
 	return removed, nil
 }
 
+// RunCleanup removes inactive sessions until ctx is cancelled.
 func (m *Manager) RunCleanup(ctx context.Context) {
 	interval := m.ttl / 2
 	if interval > time.Minute {
@@ -523,6 +538,7 @@ func storedFilenameMatches(filename, hash string) bool {
 	return strings.HasSuffix(strings.TrimSuffix(filename, extension), "_"+hash)
 }
 
+// ParseChunkIndex parses a non-negative decimal chunk index.
 func ParseChunkIndex(raw string) (int, error) {
 	index, err := strconv.Atoi(raw)
 	if err != nil || index < 0 {
