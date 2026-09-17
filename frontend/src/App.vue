@@ -1,80 +1,40 @@
 <template>
-  <Toaster
-    position="top-right"
-    :theme="isLight ? 'light' : 'dark'"
-    :offset="{ top: 72, right: 16, bottom: 16, left: 16 }"
-    :mobile-offset="{ top: 64, right: 12, bottom: 12, left: 'auto' }"
-    :visible-toasts="1"
-    :expand="false"
-    :close-button="true"
-    :duration="3600"
-  />
-  <div v-if="draggingFile || uploadStage" class="global-drop-overlay">
-    <UploadCloudIcon />
-    <strong v-if="uploadStage">{{
-      $t("clip.uploading", { progress: uploadProgress })
-    }}</strong>
-    <strong v-else>{{
-      roomFileDropHandler ? $t("rooms.dropToRoom") : $t("clip.dropToShare")
-    }}</strong>
-    <span v-if="!uploadStage">{{ $t("clip.dropRelease") }}</span>
+  <Toaster position="top-right" :theme="isLight ? 'light' : 'dark'" rich-colors close-button />
+
+  <div v-if="draggingFile || uploadStage" class="fixed inset-4 z-[100] grid place-content-center justify-items-center gap-3 rounded-xl border-2 border-dashed bg-background/95 backdrop-blur-sm">
+    <UploadCloudIcon class="size-10 text-muted-foreground" />
+    <p class="font-medium">
+      {{ uploadStage ? t("clip.uploading", { progress: uploadProgress }) : roomFileDropHandler ? t("rooms.dropToRoom") : t("clip.dropToShare") }}
+    </p>
+    <p v-if="!uploadStage" class="text-sm text-muted-foreground">{{ t("clip.dropRelease") }}</p>
   </div>
-  <header class="sticky top-0 z-50 w-full bg-background border-b border-border">
-    <div
-      class="container flex h-14 max-w-screen-md items-center justify-between py-0"
-    >
-      <router-link
-        :to="{ name: 'home' }"
-        class="flex items-center gap-2 font-bold text-lg text-foreground hover:text-foreground/80 transition-colors"
-      >
-        <span>ClipBox</span>
-      </router-link>
-      <div class="flex items-center gap-4">
-        <Select v-model="locale" @update:modelValue="saveLang">
-          <SelectTrigger
-            class="w-[110px] h-9 border-border bg-transparent focus:ring-1 focus:ring-foreground"
-          >
-            <SelectValue placeholder="Language" />
-          </SelectTrigger>
+
+  <header class="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
+    <div class="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-4">
+      <router-link :to="{ name: 'home' }" class="font-semibold">ClipBox</router-link>
+      <div class="flex items-center gap-2">
+        <Select v-model="locale" @update:model-value="saveLang">
+          <SelectTrigger class="w-32"><SelectValue placeholder="Language" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="en">English</SelectItem>
             <SelectItem value="zh">简体中文</SelectItem>
           </SelectContent>
         </Select>
-
-        <Button
-          variant="outline"
-          size="icon"
-          @click="toggleTheme"
-          class="h-9 w-9 border-border bg-transparent hover:bg-foreground hover:text-background transition-colors"
-        >
-          <Sun v-if="isLight" class="h-4 w-4" />
-          <Moon v-else class="h-4 w-4" />
+        <Button variant="outline" size="icon" :aria-label="isLight ? t('nav.themeDark') : t('nav.themeLight')" @click="toggleTheme">
+          <Sun v-if="isLight" />
+          <Moon v-else />
         </Button>
       </div>
     </div>
   </header>
 
-  <main class="container max-w-screen-md py-8 flex-1">
-    <router-view />
-  </main>
+  <main class="mx-auto w-full max-w-5xl flex-1 px-4 py-8"><router-view /></main>
 
-  <footer class="bg-background border-t border-border py-6 mt-12">
-    <div
-      class="container max-w-screen-md flex flex-col items-center justify-between gap-4"
-    >
-      <p class="text-center text-sm leading-loose text-muted-foreground">
-        &copy; {{ new Date().getFullYear() }}
-        <a
-          href="https://github.com/MeTerminator/ClipBox"
-          target="_blank"
-          class="font-medium underline underline-offset-4 hover:text-foreground"
-        >
-          ClipBox
-        </a>
-      </p>
-    </div>
+  <footer class="border-t py-6 text-center text-sm text-muted-foreground">
+    &copy; {{ new Date().getFullYear() }}
+    <a href="https://github.com/MeTerminator/ClipBox" target="_blank" class="underline underline-offset-4">ClipBox</a>
   </footer>
+
   <FileDetailModal
     :open="dropResultOpen"
     :item="dropResult"
@@ -83,16 +43,13 @@
   />
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { toast } from "vue-sonner";
+import { Moon, Sun, UploadCloudIcon } from "@lucide/vue";
 import { Toaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
-import FileDetailModal from "@/components/FileDetailModal.vue";
-import { roomFileDropHandler } from "@/composables/fileDropTarget";
-import { useFileUpload } from "@/composables/useFileUpload";
-import { Moon, Sun, UploadCloudIcon } from "lucide-vue-next";
 import {
   Select,
   SelectContent,
@@ -100,24 +57,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import FileDetailModal from "@/components/FileDetailModal.vue";
+import { roomFileDropHandler } from "@/composables/fileDropTarget";
+import { useFileUpload } from "@/composables/useFileUpload";
+import type { ClipRecord } from "@/types";
 
 const { locale, t } = useI18n();
-const isLight = ref(false);
+const isLight = ref(true);
 const draggingFile = ref(false);
 const dropResultOpen = ref(false);
-const dropResult = ref(null);
-const { uploadStage, uploadProgress, uploadFile, resetUploadProgress } =
-  useFileUpload();
+const dropResult = ref<ClipRecord | null>(null);
+const { uploadStage, uploadProgress, uploadFile, resetUploadProgress } = useFileUpload();
 let dragDepth = 0;
 
 onMounted(() => {
-  const theme = localStorage.getItem("theme") || "dark";
+  const theme = localStorage.getItem("theme") || "light";
   isLight.value = theme === "light";
-  if (theme === "dark") {
-    document.documentElement.classList.add("dark");
-  } else {
-    document.documentElement.classList.remove("dark");
-  }
+  document.documentElement.classList.toggle("dark", !isLight.value);
   window.addEventListener("dragenter", handleDragEnter);
   window.addEventListener("dragover", handleDragOver);
   window.addEventListener("dragleave", handleDragLeave);
@@ -131,32 +87,31 @@ onBeforeUnmount(() => {
   window.removeEventListener("drop", handleDrop);
 });
 
-const containsFiles = (event) =>
-  Array.from(event.dataTransfer?.types || []).includes("Files") ||
-  Boolean(event.dataTransfer?.files?.length);
-const handleDragEnter = (event) => {
+const containsFiles = (event: DragEvent) =>
+  Array.from(event.dataTransfer?.types || []).includes("Files") || Boolean(event.dataTransfer?.files.length);
+const handleDragEnter = (event: DragEvent) => {
   if (!containsFiles(event)) return;
   event.preventDefault();
   dragDepth += 1;
   draggingFile.value = true;
 };
-const handleDragOver = (event) => {
+const handleDragOver = (event: DragEvent) => {
   if (!containsFiles(event)) return;
   event.preventDefault();
   if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
 };
-const handleDragLeave = (event) => {
+const handleDragLeave = (event: DragEvent) => {
   if (!draggingFile.value) return;
   if (event.relatedTarget === null) dragDepth = 1;
   dragDepth = Math.max(0, dragDepth - 1);
   if (dragDepth === 0) draggingFile.value = false;
 };
-const handleDrop = async (event) => {
+const handleDrop = async (event: DragEvent) => {
   if (!containsFiles(event)) return;
   event.preventDefault();
   dragDepth = 0;
   draggingFile.value = false;
-  const file = event.dataTransfer?.files?.[0];
+  const file = event.dataTransfer?.files[0];
   if (!file) return;
   if (roomFileDropHandler.value) {
     await roomFileDropHandler.value(file);
@@ -166,30 +121,21 @@ const handleDrop = async (event) => {
     const count = 1000;
     const expire = 86400;
     const result = await uploadFile(file, { count, expire });
-    const expiresAt = new Date(Date.now() + expire * 1000).toISOString();
-    const item = {
+    const item: ClipRecord = {
       code: result.code,
       type: "file",
       filename: file.name,
       size: file.size,
-      expiresAt,
+      expiresAt: new Date(Date.now() + expire * 1000).toISOString(),
       remainingCount: count,
       maxCount: count,
     };
-    const history = JSON.parse(localStorage.getItem("clipHistory") || "[]");
-    localStorage.setItem(
-      "clipHistory",
-      JSON.stringify(
-        [item, ...history.filter((entry) => entry.code !== item.code)].slice(
-          0,
-          20,
-        ),
-      ),
-    );
+    const history = JSON.parse(localStorage.getItem("clipHistory") || "[]") as ClipRecord[];
+    localStorage.setItem("clipHistory", JSON.stringify([item, ...history.filter((entry) => entry.code !== item.code)].slice(0, 20)));
     dropResult.value = item;
     dropResultOpen.value = true;
   } catch (error) {
-    toast.error(error.message || t("common.unexpectedError"));
+    toast.error(error instanceof Error ? error.message : t("common.unexpectedError"));
   } finally {
     resetUploadProgress();
   }
@@ -197,45 +143,8 @@ const handleDrop = async (event) => {
 
 const toggleTheme = () => {
   isLight.value = !isLight.value;
-  if (isLight.value) {
-    document.documentElement.classList.remove("dark");
-    localStorage.setItem("theme", "light");
-  } else {
-    document.documentElement.classList.add("dark");
-    localStorage.setItem("theme", "dark");
-  }
+  document.documentElement.classList.toggle("dark", !isLight.value);
+  localStorage.setItem("theme", isLight.value ? "light" : "dark");
 };
-
-const saveLang = (value) => {
-  localStorage.setItem("lang", value);
-};
+const saveLang = (value: unknown) => localStorage.setItem("lang", String(value));
 </script>
-
-<style scoped>
-.global-drop-overlay {
-  position: fixed;
-  inset: 1rem;
-  z-index: 100;
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: 0.65rem;
-  border: 2px dashed hsl(var(--foreground) / 0.7);
-  border-radius: 1.25rem;
-  background: hsl(var(--background) / 0.94);
-  backdrop-filter: blur(12px);
-  pointer-events: none;
-}
-
-.global-drop-overlay svg {
-  width: 2.5rem;
-  height: 2.5rem;
-}
-.global-drop-overlay strong {
-  font-size: 1.2rem;
-}
-.global-drop-overlay span {
-  color: hsl(var(--muted-foreground));
-  font-size: 0.85rem;
-}
-</style>

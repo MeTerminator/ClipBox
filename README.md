@@ -24,7 +24,7 @@ ClipBox is a small temporary sharing service for files, text, and links. A five-
 ## Stack
 
 - Backend: Go, Gin, GORM, SQLite/MySQL
-- Frontend: Vue 3, Vite
+- Frontend: Vue 3, TypeScript, Vite, Tailwind CSS, shadcn-vue
 - Storage: local content-addressed files under `data/`
 
 See the [backend architecture](docs/ARCHITECTURE.md), [API contract](docs/API.md), and [Go development conventions](docs/DEVELOPMENT.md) for the maintained design boundaries.
@@ -108,7 +108,7 @@ The repository includes a manually triggered GitHub Actions workflow at `.github
 ```bash
 go test ./...
 go vet ./...
-cd frontend && npm run build
+cd frontend && npm run typecheck && npm run build
 ```
 
 ## License

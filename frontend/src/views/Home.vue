@@ -1,65 +1,60 @@
 <template>
-  <section
-    class="pickup-page animate-in fade-in slide-in-from-bottom-4 duration-500"
-  >
-    <div class="pickup-heading">
-      <h1>{{ $t("home.pickupTitle") }}</h1>
-      <p>{{ $t("home.pickupSubtitle") }}</p>
-    </div>
+  <div class="mx-auto flex min-h-[calc(100vh-15rem)] max-w-xl items-center">
+    <Card class="w-full">
+      <CardHeader class="text-center">
+        <CardTitle class="text-2xl">{{ t("home.pickupTitle") }}</CardTitle>
+        <CardDescription>{{ t("home.pickupSubtitle") }}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form class="space-y-6" @submit.prevent="pickup">
+          <div
+            class="grid grid-cols-5 gap-2 sm:gap-3"
+            role="group"
+            :aria-label="t('home.pickupCode')"
+          >
+            <Input
+              v-for="(_, index) in digits"
+              :key="index"
+              :ref="(element) => setInputRef(element, index)"
+              v-model="digits[index]"
+              class="h-14 text-center font-mono text-xl font-semibold sm:h-16 sm:text-2xl"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              maxlength="1"
+              pattern="[0-9]"
+              :aria-label="t('home.digitLabel', { number: index + 1 })"
+              @input="handleInput(index, $event)"
+              @keydown="handleKeydown(index, $event)"
+              @paste="handlePaste"
+            />
+          </div>
 
-    <form @submit.prevent="pickup" class="pickup-form">
-      <div
-        class="pickup-code-grid"
-        role="group"
-        :aria-label="$t('home.pickupCode')"
-      >
-        <input
-          v-for="(_, index) in digits"
-          :key="index"
-          :ref="(element) => setInputRef(element, index)"
-          v-model="digits[index]"
-          inputmode="numeric"
-          autocomplete="one-time-code"
-          maxlength="1"
-          pattern="[0-9]"
-          :aria-label="$t('home.digitLabel', { number: index + 1 })"
-          @input="handleInput(index, $event)"
-          @keydown="handleKeydown(index, $event)"
-          @paste="handlePaste"
-        />
-      </div>
-
-      <Button type="submit" class="pickup-submit" :disabled="loading">
-        <CloudDownloadIcon class="h-5 w-5" />
-        {{ loading ? $t("home.loading") : $t("home.pickupBtn") }}
-      </Button>
-
-      <div class="pickup-actions">
-        <router-link
-          :to="{ name: 'create', query: { tab: 'file' } }"
-          class="pickup-secondary-action"
-        >
-          <UploadCloudIcon class="h-5 w-5" />
-          {{ $t("home.sendFile") }}
-        </router-link>
-        <button
-          type="button"
-          class="pickup-secondary-action"
-          @click="historyOpen = true"
-        >
-          <HistoryIcon class="h-5 w-5" />
-          {{ $t("home.pickupHistory") }}
-        </button>
-        <router-link
-          :to="{ name: 'rooms' }"
-          class="pickup-secondary-action pickup-room-action"
-        >
-          <MessagesSquareIcon class="h-5 w-5" />
-          {{ $t("rooms.title") }}
-        </router-link>
-      </div>
-    </form>
-  </section>
+          <Button type="submit" class="w-full" size="lg" :disabled="loading">
+            <CloudDownloadIcon />
+            {{ loading ? t("home.loading") : t("home.pickupBtn") }}
+          </Button>
+        </form>
+      </CardContent>
+      <CardFooter class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <Button as-child variant="outline">
+          <router-link :to="{ name: 'create', query: { tab: 'file' } }">
+            <UploadCloudIcon />
+            {{ t("home.sendFile") }}
+          </router-link>
+        </Button>
+        <Button variant="outline" @click="historyOpen = true">
+          <HistoryIcon />
+          {{ t("home.pickupHistory") }}
+        </Button>
+        <Button as-child variant="outline">
+          <router-link :to="{ name: 'rooms' }">
+            <MessagesSquareIcon />
+            {{ t("rooms.title") }}
+          </router-link>
+        </Button>
+      </CardFooter>
+    </Card>
+  </div>
 
   <PickupResultModal
     :open="resultOpen"
@@ -76,8 +71,8 @@
   />
 </template>
 
-<script setup>
-import { nextTick, ref } from "vue";
+<script setup lang="ts">
+import { nextTick, ref, type ComponentPublicInstance } from "vue";
 import { useI18n } from "vue-i18n";
 import { toast } from "vue-sonner";
 import {
@@ -85,28 +80,53 @@ import {
   HistoryIcon,
   MessagesSquareIcon,
   UploadCloudIcon,
-} from "lucide-vue-next";
+} from "@lucide/vue";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import PickupHistoryModal from "@/components/PickupHistoryModal.vue";
 import PickupResultModal from "@/components/PickupResultModal.vue";
+import type { ClipRecord } from "@/types";
 
 const { t } = useI18n();
-const digits = ref(["", "", "", "", ""]);
-const inputRefs = ref([]);
+const digits = ref<string[]>(["", "", "", "", ""]);
+const inputRefs = ref<HTMLInputElement[]>([]);
 const loading = ref(false);
-const pickupResult = ref(null);
+const pickupResult = ref<ClipRecord | null>(null);
 const resultOpen = ref(false);
 const historyOpen = ref(false);
-const pickupHistory = ref(
-  JSON.parse(localStorage.getItem("pickupHistory") || "[]"),
-);
+const pickupHistory = ref<ClipRecord[]>(loadHistory());
 
-const setInputRef = (element, index) => {
-  if (element) inputRefs.value[index] = element;
+function loadHistory(): ClipRecord[] {
+  try {
+    return JSON.parse(localStorage.getItem("pickupHistory") || "[]") as ClipRecord[];
+  } catch {
+    return [];
+  }
+}
+
+const setInputRef = (
+  element: Element | ComponentPublicInstance | null,
+  index: number,
+) => {
+  const input = element instanceof HTMLInputElement
+    ? element
+    : element && "$el" in element
+      ? (element.$el as HTMLInputElement)
+      : undefined;
+  if (input) inputRefs.value[index] = input;
 };
 
-const handleInput = (index, event) => {
-  const value = event.target.value.replace(/\D/g, "").slice(-1);
+const handleInput = (index: number, event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const value = target.value.replace(/\D/g, "").slice(-1);
   digits.value[index] = value;
   if (value && index < digits.value.length - 1) {
     nextTick(() => inputRefs.value[index + 1]?.focus());
@@ -115,19 +135,16 @@ const handleInput = (index, event) => {
   }
 };
 
-const handleKeydown = (index, event) => {
+const handleKeydown = (index: number, event: KeyboardEvent) => {
   if (event.key === "Backspace" && !digits.value[index] && index > 0) {
     digits.value[index - 1] = "";
     nextTick(() => inputRefs.value[index - 1]?.focus());
   }
 };
 
-const handlePaste = (event) => {
+const handlePaste = (event: ClipboardEvent) => {
   event.preventDefault();
-  const pasted = event.clipboardData
-    .getData("text")
-    .replace(/\D/g, "")
-    .slice(0, 5);
+  const pasted = event.clipboardData?.getData("text").replace(/\D/g, "").slice(0, 5) || "";
   pasted.split("").forEach((digit, index) => {
     digits.value[index] = digit;
   });
@@ -148,13 +165,14 @@ const pickup = async () => {
       method: "POST",
       headers: { Accept: "application/json" },
     });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok)
+    const data = (await response.json().catch(() => ({}))) as ClipRecord;
+    if (!response.ok) {
       throw new Error(
         response.status === 404
           ? t("home.notFound")
           : t("common.requestFailed", { status: response.status }),
       );
+    }
     pickupResult.value = data;
     const record = { ...data, retrievedAt: new Date().toISOString() };
     pickupHistory.value = [
@@ -165,14 +183,18 @@ const pickup = async () => {
     resultOpen.value = true;
   } catch (error) {
     toast.error(
-      error instanceof TypeError ? t("common.networkError") : error.message,
+      error instanceof TypeError
+        ? t("common.networkError")
+        : error instanceof Error
+          ? error.message
+          : t("common.unexpectedError"),
     );
   } finally {
     loading.value = false;
   }
 };
 
-const openHistoryRecord = (record) => {
+const openHistoryRecord = (record: ClipRecord) => {
   historyOpen.value = false;
   pickupResult.value = record;
   resultOpen.value = true;
@@ -185,131 +207,3 @@ const clearPickupHistory = () => {
   toast.success(t("home.pickupHistoryCleared"));
 };
 </script>
-
-<style scoped>
-.pickup-page {
-  min-height: min(440px, calc(100vh - 210px));
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem 0 4rem;
-}
-
-.pickup-heading {
-  text-align: center;
-}
-
-.pickup-heading h1 {
-  font-size: clamp(2rem, 5vw, 2.65rem);
-  font-weight: 800;
-  letter-spacing: -0.04em;
-}
-
-.pickup-heading p {
-  margin-top: 0.6rem;
-  color: hsl(var(--muted-foreground));
-  font-size: 0.95rem;
-}
-
-.pickup-form {
-  width: min(100%, 390px);
-  margin-top: 2.6rem;
-}
-
-.pickup-code-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.9rem;
-}
-
-.pickup-code-grid input {
-  width: 100%;
-  height: 80px;
-  border: 1px solid hsl(var(--border) / 0.4);
-  border-radius: 1rem;
-  background: hsl(var(--card) / 0.3);
-  color: hsl(var(--foreground));
-  text-align: center;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 2rem;
-  font-weight: 700;
-  transition:
-    border-color 160ms ease,
-    background 160ms ease;
-}
-
-.pickup-code-grid input:focus {
-  border-color: hsl(var(--foreground) / 0.65);
-  background: hsl(var(--card) / 0.65);
-}
-
-.pickup-submit {
-  width: 100%;
-  height: 58px;
-  margin-top: 2rem;
-  border: 1px solid hsl(var(--border) / 0.45);
-  border-radius: 1rem;
-  background: hsl(var(--foreground) / 0.07);
-  color: hsl(var(--muted-foreground));
-  font-size: 1rem;
-  font-weight: 700;
-  transition:
-    background 160ms ease,
-    color 160ms ease,
-    border-color 160ms ease;
-}
-
-.pickup-submit:not(:disabled):hover {
-  border-color: hsl(var(--foreground) / 0.4);
-  background: hsl(var(--foreground));
-  color: hsl(var(--background));
-}
-
-.pickup-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.85rem;
-  margin-top: 0.85rem;
-}
-
-.pickup-secondary-action {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.55rem;
-  height: 48px;
-  border: 1px solid hsl(var(--border) / 0.28);
-  border-radius: 0.9rem;
-  color: hsl(var(--muted-foreground));
-  font-size: 0.92rem;
-  font-weight: 650;
-  text-decoration: none;
-  background: transparent;
-  transition:
-    border-color 160ms ease,
-    background 160ms ease,
-    color 160ms ease;
-}
-
-.pickup-secondary-action:hover {
-  border-color: hsl(var(--foreground) / 0.45);
-  background: hsl(var(--foreground) / 0.06);
-  color: hsl(var(--foreground));
-}
-
-.pickup-room-action {
-  grid-column: 1 / -1;
-}
-
-@media (max-width: 480px) {
-  .pickup-code-grid {
-    gap: 0.5rem;
-  }
-  .pickup-code-grid input {
-    height: 68px;
-    border-radius: 0.8rem;
-    font-size: 1.65rem;
-  }
-}
-</style>

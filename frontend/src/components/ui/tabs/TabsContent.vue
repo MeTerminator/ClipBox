@@ -1,21 +1,13 @@
-<script setup>
-import { reactiveOmit } from "@vueuse/core";
-import { TabsContent } from "reka-ui";
-import { cn } from "@/lib/utils";
+<script setup lang="ts">
+import type { TabsContentProps } from 'reka-ui'
+import type { HTMLAttributes } from 'vue'
+import { reactiveOmit } from '@vueuse/core'
+import { TabsContent } from 'reka-ui'
+import { cn } from '@/lib/utils'
 
-const props = defineProps({
-  value: { type: [String, Number], required: true },
-  forceMount: { type: Boolean, required: false },
-  asChild: { type: Boolean, required: false },
-  as: { type: null, required: false },
-  class: {
-    type: [Boolean, null, String, Object, Array],
-    required: false,
-    skipCheck: true,
-  },
-});
+const props = defineProps<TabsContentProps & { class?: HTMLAttributes['class'] }>()
 
-const delegatedProps = reactiveOmit(props, "class");
+const delegatedProps = reactiveOmit(props, 'class')
 </script>
 
 <template>

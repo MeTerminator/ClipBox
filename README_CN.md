@@ -24,7 +24,7 @@ ClipBox 是一个轻量的临时文件、文本和链接分享服务。用户通
 ## 技术栈
 
 - 后端：Go、Gin、GORM、SQLite/MySQL
-- 前端：Vue 3、Vite
+- 前端：Vue 3、TypeScript、Vite、Tailwind CSS、shadcn-vue
 - 存储：`data/` 下的本地内容寻址文件
 
 后端的包职责、依赖方向和数据一致性约束见 [架构说明](docs/ARCHITECTURE.md)；接口细节见 [API 契约](docs/API.md)，参与开发前请阅读 [Go 开发规范](docs/DEVELOPMENT.md)。
@@ -108,7 +108,7 @@ go run .
 ```bash
 go test ./...
 go vet ./...
-cd frontend && npm run build
+cd frontend && npm run typecheck && npm run build
 ```
 
 ## 许可证

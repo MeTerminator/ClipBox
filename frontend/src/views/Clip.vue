@@ -1,28 +1,17 @@
 <template>
-  <Card
-    class="border border-border bg-card shadow-none p-6 animate-in fade-in duration-200"
-  >
+  <Card class="mx-auto max-w-2xl p-6">
     <!-- Header Back Link -->
     <div class="mb-6">
-      <router-link
-        :to="{ name: 'home' }"
-        class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <ArrowLeftIcon class="h-4 w-4" />
-        {{ $t("clip.backToHome") }}
-      </router-link>
+      <Button as-child variant="ghost" class="-ml-3">
+        <router-link :to="{ name: 'home' }"><ArrowLeftIcon />{{ $t("clip.backToHome") }}</router-link>
+      </Button>
     </div>
 
     <!-- Redirect notice banner -->
-    <div
-      v-if="route.query.redirect"
-      class="flex items-start gap-2.5 p-3 border border-border bg-transparent text-foreground rounded-lg text-sm mb-6"
-    >
-      <InfoIcon class="h-4 w-4 mt-0.5 shrink-0" />
-      <span>{{
-        $t("clip.redirectNotice", { domain: getDomain(route.query.redirect) })
-      }}</span>
-    </div>
+    <Alert v-if="route.query.redirect" class="mb-6">
+      <InfoIcon />
+      <AlertDescription>{{ $t("clip.redirectNotice", { domain: getDomain(route.query.redirect) }) }}</AlertDescription>
+    </Alert>
 
     <!-- Tabs Navigation -->
     <Tabs v-model="activeTab" class="w-full">
@@ -42,11 +31,7 @@
           <Label class="text-sm font-semibold text-muted-foreground">{{
             $t("clip.contentLabel")
           }}</Label>
-          <Textarea
-            v-model="formData.content"
-            class="min-h-[150px] bg-transparent border-border focus-visible:ring-1 focus-visible:ring-foreground"
-            required
-          />
+          <Textarea v-model="formData.content" class="min-h-36" required />
         </div>
 
         <!-- Link Tab Input -->
@@ -54,12 +39,7 @@
           <Label class="text-sm font-semibold text-muted-foreground">{{
             $t("clip.linkUrl")
           }}</Label>
-          <Input
-            v-model="formData.content"
-            type="url"
-            class="bg-transparent border-border focus-visible:ring-1 focus-visible:ring-foreground"
-            required
-          />
+          <Input v-model="formData.content" type="url" required />
         </div>
 
         <!-- File Tab Input -->
@@ -69,7 +49,7 @@
           }}</Label>
           <div
             class="rounded-lg p-8 text-center cursor-pointer transition-colors duration-200 flex flex-col items-center justify-center min-h-[150px] border-border hover:border-foreground border-dashed border"
-            @click="fileInput.click()"
+            @click="fileInput?.click()"
           >
             <input
               type="file"
@@ -102,12 +82,7 @@
               </span>
               <span>{{ uploadProgress }}%</span>
             </div>
-            <div class="h-2 overflow-hidden rounded-full bg-muted">
-              <div
-                class="h-full bg-foreground transition-[width] duration-200"
-                :style="{ width: `${uploadProgress}%` }"
-              />
-            </div>
+            <Progress :model-value="uploadProgress" />
             <p v-if="resumedChunks" class="text-xs text-muted-foreground">
               {{ $t("clip.resuming", { count: resumedChunks }) }}
             </p>
@@ -120,28 +95,16 @@
             <Label class="text-sm font-semibold text-muted-foreground">{{
               $t("clip.countLabel")
             }}</Label>
-            <Input
-              v-model="formData.count"
-              type="number"
-              min="1"
-              class="bg-transparent border-border focus-visible:ring-1 focus-visible:ring-foreground"
-            />
+            <Input v-model="formData.count" type="number" min="1" />
           </div>
           <div class="flex flex-col gap-2">
             <Label class="text-sm font-semibold text-muted-foreground">{{
               $t("clip.expireLabel")
             }}</Label>
             <div class="flex gap-2">
-              <Input
-                v-model="formData.expire"
-                type="number"
-                min="1"
-                class="flex-1 bg-transparent border-border focus-visible:ring-1 focus-visible:ring-foreground"
-              />
+              <Input v-model="formData.expire" type="number" min="1" class="flex-1" />
               <Select v-model="formData.expireUnit">
-                <SelectTrigger
-                  class="w-[110px] bg-transparent border-border focus:ring-1 focus:ring-foreground"
-                >
+                <SelectTrigger class="w-[110px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -172,7 +135,8 @@
         <!-- Submit Button -->
         <Button
           type="submit"
-          class="w-full font-semibold shadow-none border border-foreground bg-foreground text-background hover:bg-background hover:text-foreground py-6 transition-colors"
+          class="w-full"
+          size="lg"
           :disabled="loading"
         >
           {{
@@ -186,16 +150,15 @@
       </form>
 
       <!-- Redirect Confirmation Box -->
-      <div
-        v-if="pendingRedirect"
-        class="mt-6 p-4 border border-border bg-transparent rounded-lg space-y-3"
-      >
-        <p class="text-muted-foreground text-sm">
+      <Alert v-if="pendingRedirect" class="mt-6">
+        <InfoIcon />
+        <AlertDescription class="space-y-3">
+          <p>
           {{
             $t("clip.redirectMsg", { domain: getDomain(route.query.redirect) })
           }}
-        </p>
-        <div class="flex gap-3">
+          </p>
+          <div class="flex gap-3">
           <Button @click="doRedirect" size="sm" class="text-xs font-semibold">
             {{ $t("clip.redirectBtn") }}
           </Button>
@@ -203,20 +166,18 @@
             @click="pendingRedirect = null"
             size="sm"
             variant="outline"
-            class="text-xs border-border bg-transparent hover:bg-foreground hover:text-background"
+            class="text-xs"
           >
             {{ $t("clip.stayBtn") }}
           </Button>
-        </div>
-      </div>
+          </div>
+        </AlertDescription>
+      </Alert>
 
       <!-- Error Message Box -->
-      <div
-        v-if="errorMsg"
-        class="mt-6 p-4 border border-destructive bg-transparent rounded-lg text-sm text-destructive"
-      >
-        {{ $t("clip.error") }}{{ errorMsg }}
-      </div>
+      <Alert v-if="errorMsg" variant="destructive" class="mt-6">
+        <AlertDescription>{{ $t("clip.error") }}{{ errorMsg }}</AlertDescription>
+      </Alert>
     </div>
 
     <!-- History Tab Section -->
@@ -241,7 +202,7 @@
         <li
           v-for="item in history"
           :key="item.code"
-          class="flex items-center justify-between p-3 rounded-lg border border-border bg-transparent hover:border-foreground transition-colors"
+          class="flex items-center justify-between rounded-lg border p-3"
         >
           <div class="flex w-full items-center gap-3 overflow-hidden">
             <span class="text-muted-foreground shrink-0">
@@ -290,8 +251,8 @@
   />
 </template>
 
-<script setup>
-import { ref, onMounted, watch } from "vue";
+<script setup lang="ts">
+import { ref, onMounted, watch, type Component } from "vue";
 import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { Card } from "@/components/ui/card";
@@ -301,6 +262,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -310,6 +273,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "vue-sonner";
 import { useFileUpload } from "@/composables/useFileUpload";
+import type { ClipKind, ClipRecord } from "@/types";
 import {
   ArrowLeftIcon,
   UploadCloudIcon,
@@ -319,26 +283,28 @@ import {
   FileIcon,
   ExternalLinkIcon,
   InfoIcon,
-} from "lucide-vue-next";
+} from "@lucide/vue";
 
 const route = useRoute();
 const { t } = useI18n();
 
-const activeTab = ref(route.query.tab === "file" ? "file" : "text");
+type CreateTab = "text" | "link" | "file" | "history";
+
+const activeTab = ref<CreateTab>(route.query.tab === "file" ? "file" : "text");
 const formData = ref({
   content: "",
   count: 1000,
   expire: 1,
   expireUnit: "86400",
 });
-const selectedFile = ref(null);
+const selectedFile = ref<File | null>(null);
 const loading = ref(false);
 const errorMsg = ref("");
-const pendingRedirect = ref(null);
-const history = ref([]);
+const pendingRedirect = ref<string | null>(null);
+const history = ref<ClipRecord[]>([]);
 const detailModalOpen = ref(false);
-const detailItem = ref(null);
-const fileInput = ref(null);
+const detailItem = ref<ClipRecord | null>(null);
+const fileInput = ref<HTMLInputElement | null>(null);
 const {
   uploadStage,
   uploadProgress,
@@ -348,7 +314,7 @@ const {
 } = useFileUpload();
 
 onMounted(() => {
-  history.value = JSON.parse(localStorage.getItem("clipHistory") || "[]");
+  history.value = JSON.parse(localStorage.getItem("clipHistory") || "[]") as ClipRecord[];
 });
 
 watch(
@@ -358,22 +324,25 @@ watch(
   },
 );
 
-const formatSize = (bytes) => {
+const formatSize = (bytes: number) => {
   if (bytes === 0) return "0 B";
   const k = 1024;
   const sizes = ["B", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + (sizes[i] || "B");
 };
 
-const handleFileSelect = (e) => {
-  selectedFile.value = e.target.files[0];
+const handleFileSelect = (event: Event) => {
+  selectedFile.value = (event.target as HTMLInputElement).files?.[0] || null;
   resetUploadProgress();
 };
 
-const requestJSON = async (url, options) => {
+const requestJSON = async <T extends Record<string, unknown> = Record<string, unknown>>(
+  url: string,
+  options?: RequestInit,
+): Promise<T> => {
   const response = await fetch(url, options);
-  const data = await response.json().catch(() => ({}));
+  const data = (await response.json().catch(() => ({}))) as T;
   if (!response.ok) {
     if (response.status === 404) throw new Error(t("home.notFound"));
     if (response.status === 413) throw new Error(t("clip.fileTooLarge"));
@@ -392,7 +361,7 @@ const submitClip = async () => {
     const count = Number(formData.value.count);
     const expire =
       Number(formData.value.expire) * parseInt(formData.value.expireUnit);
-    let data;
+    let data: { code: string };
 
     if (activeTab.value === "file") {
       if (!selectedFile.value) {
@@ -403,14 +372,14 @@ const submitClip = async () => {
       data = await uploadFile(selectedFile.value, { count, expire });
     } else {
       const fd = new FormData();
-      fd.append("count", count);
-      fd.append("expire", expire);
+      fd.append("count", String(count));
+      fd.append("expire", String(expire));
       fd.append("content", formData.value.content);
       fd.append("link", activeTab.value === "link" ? "yes" : "no");
-      data = await requestJSON("/clip/create", { method: "POST", body: fd });
+      data = await requestJSON<{ code: string }>("/clip/create", { method: "POST", body: fd });
     }
 
-    if (data.code) {
+    if (typeof data.code === "string") {
       const filename = selectedFile.value?.name || "";
       const size = selectedFile.value?.size || 0;
       const expiresAt = new Date(Date.now() + expire * 1000).toISOString();
@@ -424,7 +393,7 @@ const submitClip = async () => {
       );
       detailItem.value = {
         code: data.code,
-        type: activeTab.value,
+        type: activeTab.value as Exclude<CreateTab, "history">,
         filename,
         size,
         expiresAt,
@@ -448,21 +417,23 @@ const submitClip = async () => {
       errorMsg.value = t("clip.createFailed");
       toast.error(errorMsg.value);
     }
-  } catch (err) {
+  } catch (err: unknown) {
     errorMsg.value =
       err instanceof TypeError
         ? t("common.networkError")
-        : err.message || t("common.unexpectedError");
+        : err instanceof Error
+          ? err.message
+          : t("common.unexpectedError");
     toast.error(errorMsg.value);
   } finally {
     loading.value = false;
   }
 };
 
-const getDomain = (url) => {
+const getDomain = (url: unknown) => {
   try {
     return new URL(String(url)).hostname;
-  } catch (e) {
+  } catch {
     return String(url);
   }
 };
@@ -474,14 +445,15 @@ const doRedirect = () => {
 };
 
 const addToHistory = (
-  code,
-  type,
+  code: string,
+  type: CreateTab,
   filename = "",
   size = 0,
   expiresAt = "",
   maxCount = 0,
 ) => {
-  const entry = {
+  if (type === "history") return;
+  const entry: ClipRecord = {
     code,
     type,
     filename,
@@ -501,10 +473,18 @@ const clearHistory = () => {
   toast.success(t("clip.historyCleared"));
 };
 
-const openHistoryItem = async (item) => {
+const openHistoryItem = async (item: ClipRecord) => {
   try {
-    const info = await requestJSON(`/clip/${item.code}/info`);
-    const refreshed = {
+    const info = await requestJSON<{
+      type: ClipKind;
+      filename?: string;
+      size?: number;
+      expires_at: string;
+      remaining_count: number;
+      max_count: number;
+      expired: boolean;
+    }>(`/clip/${item.code}/info`);
+    const refreshed: ClipRecord = {
       ...item,
       type: info.type === "text/plain" ? "text" : info.type,
       filename: info.filename || item.filename || "",
@@ -519,16 +499,18 @@ const openHistoryItem = async (item) => {
     if (index !== -1) history.value[index] = refreshed;
     localStorage.setItem("clipHistory", JSON.stringify(history.value));
     detailModalOpen.value = true;
-  } catch (error) {
+  } catch (error: unknown) {
     toast.error(
       error instanceof TypeError
         ? t("common.networkError")
-        : error.message || t("common.unexpectedError"),
+        : error instanceof Error
+          ? error.message
+          : t("common.unexpectedError"),
     );
   }
 };
 
-const getIconComponent = (type) => {
+const getIconComponent = (type: ClipKind): Component => {
   if (type === "file") return FileIcon;
   if (type === "link") return LinkIcon;
   return FileTextIcon;

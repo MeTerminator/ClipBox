@@ -1,27 +1,15 @@
-<script setup>
-import { reactiveOmit } from "@vueuse/core";
-import { TabsRoot, useForwardPropsEmits } from "reka-ui";
-import { cn } from "@/lib/utils";
+<script setup lang="ts">
+import type { TabsRootEmits, TabsRootProps } from 'reka-ui'
+import type { HTMLAttributes } from 'vue'
+import { reactiveOmit } from '@vueuse/core'
+import { TabsRoot, useForwardPropsEmits } from 'reka-ui'
+import { cn } from '@/lib/utils'
 
-const props = defineProps({
-  defaultValue: { type: null, required: false },
-  orientation: { type: String, required: false },
-  dir: { type: String, required: false },
-  activationMode: { type: String, required: false },
-  modelValue: { type: null, required: false },
-  unmountOnHide: { type: Boolean, required: false },
-  asChild: { type: Boolean, required: false },
-  as: { type: null, required: false },
-  class: {
-    type: [Boolean, null, String, Object, Array],
-    required: false,
-    skipCheck: true,
-  },
-});
-const emits = defineEmits(["update:modelValue"]);
+const props = defineProps<TabsRootProps & { class?: HTMLAttributes['class'] }>()
+const emits = defineEmits<TabsRootEmits>()
 
-const delegatedProps = reactiveOmit(props, "class");
-const forwarded = useForwardPropsEmits(delegatedProps, emits);
+const delegatedProps = reactiveOmit(props, 'class')
+const forwarded = useForwardPropsEmits(delegatedProps, emits)
 </script>
 
 <template>
@@ -30,7 +18,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits);
     data-slot="tabs"
     :data-orientation="forwarded.orientation || 'horizontal'"
     v-bind="forwarded"
-    :class="cn('w-full flex flex-col gap-2', props.class)"
+    :class="cn('gap-2 group/tabs flex data-horizontal:flex-col', props.class)"
   >
     <slot v-bind="slotProps" />
   </TabsRoot>

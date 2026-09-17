@@ -52,7 +52,7 @@
 gofmt -w main.go internal/*/*.go
 go vet ./...
 go test ./...
-cd frontend && npm run build
+cd frontend && npm run typecheck && npm run build
 ```
 
 在受限环境中 Go 默认缓存不可写时，可使用：

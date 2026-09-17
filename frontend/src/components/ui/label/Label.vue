@@ -1,20 +1,13 @@
-<script setup>
-import { reactiveOmit } from "@vueuse/core";
-import { Label } from "reka-ui";
-import { cn } from "@/lib/utils";
+<script setup lang="ts">
+import type { LabelProps } from 'reka-ui'
+import type { HTMLAttributes } from 'vue'
+import { reactiveOmit } from '@vueuse/core'
+import { Label } from 'reka-ui'
+import { cn } from '@/lib/utils'
 
-const props = defineProps({
-  for: { type: String, required: false },
-  asChild: { type: Boolean, required: false },
-  as: { type: null, required: false },
-  class: {
-    type: [Boolean, null, String, Object, Array],
-    required: false,
-    skipCheck: true,
-  },
-});
+const props = defineProps<LabelProps & { class?: HTMLAttributes['class'] }>()
 
-const delegatedProps = reactiveOmit(props, "class");
+const delegatedProps = reactiveOmit(props, 'class')
 </script>
 
 <template>
