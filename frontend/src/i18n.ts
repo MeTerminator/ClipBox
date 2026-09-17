@@ -91,8 +91,10 @@ const messages = {
       },
     },
     nav: {
+      theme: "Theme",
       themeLight: "Light Mode",
       themeDark: "Dark Mode",
+      themeSystem: "System",
     },
     rooms: {
       title: "Share Rooms",
@@ -228,8 +230,10 @@ const messages = {
       },
     },
     nav: {
+      theme: "主题",
       themeLight: "日间模式",
       themeDark: "夜间模式",
+      themeSystem: "跟随系统",
     },
     rooms: {
       title: "分享房间",

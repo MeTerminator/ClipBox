@@ -72,7 +72,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref, type ComponentPublicInstance } from "vue";
+import { nextTick, onBeforeUnmount, onMounted, ref, type ComponentPublicInstance } from "vue";
 import { useI18n } from "vue-i18n";
 import { toast } from "vue-sonner";
 import {
@@ -152,6 +152,20 @@ const handlePaste = (event: ClipboardEvent) => {
   if (pasted.length === 5) nextTick(pickup);
 };
 
+const handlePageDigit = (event: KeyboardEvent) => {
+  if (event.metaKey || event.ctrlKey || event.altKey || resultOpen.value || historyOpen.value || !/^\d$/.test(event.key)) return;
+  const target = event.target;
+  if (target instanceof HTMLElement && target.matches("input, textarea, select, [contenteditable='true']")) return;
+
+  const index = digits.value.findIndex((digit) => !digit);
+  if (index === -1) return;
+
+  event.preventDefault();
+  digits.value[index] = event.key;
+  if (index < digits.value.length - 1) nextTick(() => inputRefs.value[index + 1]?.focus());
+  else nextTick(pickup);
+};
+
 const pickup = async () => {
   const code = digits.value.join("");
   if (!/^\d{5}$/.test(code)) {
@@ -206,4 +220,7 @@ const clearPickupHistory = () => {
   historyOpen.value = false;
   toast.success(t("home.pickupHistoryCleared"));
 };
+
+onMounted(() => window.addEventListener("keydown", handlePageDigit));
+onBeforeUnmount(() => window.removeEventListener("keydown", handlePageDigit));
 </script>

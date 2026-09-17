@@ -1,5 +1,5 @@
 <template>
-  <Toaster position="top-right" :theme="isLight ? 'light' : 'dark'" rich-colors close-button />
+  <Toaster position="top-right" :theme="resolvedTheme" rich-colors close-button />
 
   <div v-if="draggingFile || uploadStage" class="fixed inset-4 z-[100] grid place-content-center justify-items-center gap-3 rounded-xl border-2 border-dashed bg-background/95 backdrop-blur-sm">
     <UploadCloudIcon class="size-10 text-muted-foreground" />
@@ -20,10 +20,14 @@
             <SelectItem value="zh">简体中文</SelectItem>
           </SelectContent>
         </Select>
-        <Button variant="outline" size="icon" :aria-label="isLight ? t('nav.themeDark') : t('nav.themeLight')" @click="toggleTheme">
-          <Sun v-if="isLight" />
-          <Moon v-else />
-        </Button>
+        <Select v-model="themePreference" @update:model-value="setTheme">
+          <SelectTrigger class="w-32" :aria-label="t('nav.theme')"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="light"><Sun />{{ t('nav.themeLight') }}</SelectItem>
+            <SelectItem value="dark"><Moon />{{ t('nav.themeDark') }}</SelectItem>
+            <SelectItem value="system"><MonitorIcon />{{ t('nav.themeSystem') }}</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
     </div>
   </header>
@@ -44,12 +48,11 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { toast } from "vue-sonner";
-import { Moon, Sun, UploadCloudIcon } from "@lucide/vue";
+import { MonitorIcon, Moon, Sun, UploadCloudIcon } from "@lucide/vue";
 import { Toaster } from "@/components/ui/sonner";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -63,17 +66,28 @@ import { useFileUpload } from "@/composables/useFileUpload";
 import type { ClipRecord } from "@/types";
 
 const { locale, t } = useI18n();
-const isLight = ref(true);
+type ThemePreference = "light" | "dark" | "system";
+
+const themePreference = ref<ThemePreference>("system");
+const systemPrefersDark = ref(false);
+const resolvedTheme = computed<"light" | "dark">(() => themePreference.value === "system" ? (systemPrefersDark.value ? "dark" : "light") : themePreference.value);
 const draggingFile = ref(false);
 const dropResultOpen = ref(false);
 const dropResult = ref<ClipRecord | null>(null);
 const { uploadStage, uploadProgress, uploadFile, resetUploadProgress } = useFileUpload();
 let dragDepth = 0;
+let colorSchemeQuery: MediaQueryList | null = null;
+
+const applyTheme = () => document.documentElement.classList.toggle("dark", resolvedTheme.value === "dark");
+const handleSystemThemeChange = (event: MediaQueryListEvent) => { systemPrefersDark.value = event.matches; applyTheme(); };
 
 onMounted(() => {
-  const theme = localStorage.getItem("theme") || "light";
-  isLight.value = theme === "light";
-  document.documentElement.classList.toggle("dark", !isLight.value);
+  const savedTheme = localStorage.getItem("theme");
+  if (savedTheme === "light" || savedTheme === "dark" || savedTheme === "system") themePreference.value = savedTheme;
+  colorSchemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  systemPrefersDark.value = colorSchemeQuery.matches;
+  colorSchemeQuery.addEventListener("change", handleSystemThemeChange);
+  applyTheme();
   window.addEventListener("dragenter", handleDragEnter);
   window.addEventListener("dragover", handleDragOver);
   window.addEventListener("dragleave", handleDragLeave);
@@ -81,6 +95,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  colorSchemeQuery?.removeEventListener("change", handleSystemThemeChange);
   window.removeEventListener("dragenter", handleDragEnter);
   window.removeEventListener("dragover", handleDragOver);
   window.removeEventListener("dragleave", handleDragLeave);
@@ -141,10 +156,11 @@ const handleDrop = async (event: DragEvent) => {
   }
 };
 
-const toggleTheme = () => {
-  isLight.value = !isLight.value;
-  document.documentElement.classList.toggle("dark", !isLight.value);
-  localStorage.setItem("theme", isLight.value ? "light" : "dark");
+const setTheme = (value: unknown) => {
+  if (value !== "light" && value !== "dark" && value !== "system") return;
+  themePreference.value = value;
+  localStorage.setItem("theme", value);
+  applyTheme();
 };
 const saveLang = (value: unknown) => localStorage.setItem("lang", String(value));
 </script>

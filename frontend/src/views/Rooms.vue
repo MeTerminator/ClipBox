@@ -82,7 +82,7 @@
             <div v-if="!messages.length" class="flex h-[460px] flex-col items-center justify-center gap-2 text-center text-muted-foreground"><MessagesSquareIcon class="size-8" /><p>{{ t("rooms.empty") }}</p></div>
             <div v-else class="space-y-4">
               <article v-for="message in messages" :key="message.id" :class="['flex flex-col gap-1', message.sender.id === session.room.current_member_id ? 'items-end' : 'items-start']">
-                <div class="flex items-center gap-2 text-xs text-muted-foreground"><span>{{ message.sender.nickname }}</span><span>{{ formatTime(message.created_at) }}</span><Badge v-if="message.source === 'clipboard'" variant="secondary">{{ t("rooms.clipboard") }}</Badge></div>
+                <div class="flex items-center gap-2 text-xs text-muted-foreground"><ClipboardIcon v-if="message.source === 'clipboard'" class="size-4 text-amber-500" :title="t('rooms.clipboard')" /><span>{{ message.sender.nickname }}</span><span>{{ formatTime(message.created_at) }}</span></div>
                 <div v-if="message.kind === 'text'" class="max-w-[85%] whitespace-pre-wrap rounded-lg bg-muted px-3 py-2 text-sm">{{ message.text }}</div>
                 <Button v-else-if="message.file" variant="outline" class="h-auto max-w-[85%] justify-start py-3" @click="downloadFile(message)"><FileIcon /><span class="min-w-0 text-left"><span class="block truncate font-medium">{{ message.file.name }}</span><span class="block text-xs text-muted-foreground">{{ formatSize(message.file.size) }}</span></span><DownloadIcon /></Button>
               </article>
@@ -137,7 +137,7 @@ import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import type { RoomInfo, RoomMessage, RoomSession, SavedRoom } from "@/types";
-import { ArrowLeftIcon, CheckIcon, ChevronRightIcon, CopyIcon, CrownIcon, DownloadIcon, FileIcon, LinkIcon, LogInIcon, LogOutIcon, MessagesSquareIcon, PaperclipIcon, PencilIcon, PlusIcon, SendIcon, Trash2Icon } from "@lucide/vue";
+import { ArrowLeftIcon, CheckIcon, ChevronRightIcon, ClipboardIcon, CopyIcon, CrownIcon, DownloadIcon, FileIcon, LinkIcon, LogInIcon, LogOutIcon, MessagesSquareIcon, PaperclipIcon, PencilIcon, PlusIcon, SendIcon, Trash2Icon } from "@lucide/vue";
 
 class HTTPError extends Error { constructor(message: string, public readonly status: number) { super(message); } }
 
