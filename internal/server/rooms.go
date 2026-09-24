@@ -23,6 +23,7 @@ import (
 
 type roomIdentityRequest struct {
 	Nickname string `json:"nickname"`
+	Password string `json:"password"`
 	Device   string `json:"device"`
 	OS       string `json:"os"`
 	Browser  string `json:"browser"`
@@ -35,6 +36,14 @@ type createRoomRequest struct {
 
 type renameRoomRequest struct {
 	Name string `json:"name"`
+}
+
+type updateNicknameRequest struct {
+	Nickname string `json:"nickname"`
+}
+
+type roomPasswordRequest struct {
+	Password string `json:"password"`
 }
 
 func (s *Server) createRoom(c *gin.Context) {
@@ -89,9 +98,13 @@ func (s *Server) joinRoom(c *gin.Context) {
 		jsonError(c, http.StatusInternalServerError, "Could not create identity")
 		return
 	}
-	room, err := s.rooms.JoinRoom(c.Request.Context(), normalizedRoomID(c.Param("roomID")), member)
+	room, err := s.sharing.JoinRoom(c.Request.Context(), normalizedRoomID(c.Param("roomID")), request.Password, member)
 	if err != nil {
-		jsonError(c, http.StatusNotFound, "Room not found")
+		if errors.Is(err, share.ErrUnauthorized) {
+			jsonError(c, http.StatusUnauthorized, "Incorrect room password")
+		} else {
+			jsonError(c, http.StatusNotFound, "Room not found")
+		}
 		return
 	}
 	room.Members = append(room.Members, *member)
@@ -129,7 +142,7 @@ func (s *Server) renameRoom(c *gin.Context) {
 		jsonError(c, http.StatusNotImplemented, "Room sharing is unavailable")
 		return
 	}
-	room, member, ok := s.authenticatedRoom(c)
+	room, _, ok := s.authenticatedRoom(c)
 	if !ok {
 		return
 	}
@@ -139,17 +152,74 @@ func (s *Server) renameRoom(c *gin.Context) {
 		return
 	}
 	name := cleanRoomText(request.Name, 80)
-	if err := s.sharing.RenameRoom(c.Request.Context(), room, member, name); err != nil {
-		if errors.Is(err, share.ErrForbidden) {
-			jsonError(c, http.StatusForbidden, "Only the room creator can rename it")
-		} else {
-			jsonError(c, http.StatusInternalServerError, "Could not rename room")
-		}
+	if err := s.sharing.RenameRoom(c.Request.Context(), room, name); err != nil {
+		jsonError(c, http.StatusInternalServerError, "Could not rename room")
 		return
 	}
 	room.Name = name
 	s.hub.Broadcast(room.ID, gin.H{"type": "room_updated", "name": name})
 	c.JSON(http.StatusOK, gin.H{"name": name})
+}
+
+func (s *Server) updateRoomNickname(c *gin.Context) {
+	if s.rooms == nil {
+		jsonError(c, http.StatusNotImplemented, "Room sharing is unavailable")
+		return
+	}
+	room, member, ok := s.authenticatedRoom(c)
+	if !ok {
+		return
+	}
+	var request updateNicknameRequest
+	if c.ShouldBindJSON(&request) != nil {
+		jsonError(c, http.StatusBadRequest, "Invalid member data")
+		return
+	}
+	nickname := cleanRoomText(request.Nickname, 40)
+	if err := s.sharing.UpdateNickname(c.Request.Context(), member, nickname); err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, share.ErrInvalidRoom) {
+			status = http.StatusBadRequest
+		}
+		jsonError(c, status, "Could not update nickname")
+		return
+	}
+	member.Nickname = nickname
+	for i := range room.Members {
+		if room.Members[i].ID == member.ID {
+			room.Members[i].Nickname = nickname
+		}
+	}
+	s.hub.Broadcast(room.ID, gin.H{"type": "member_updated", "member": memberResponse(*member, true)})
+	c.JSON(http.StatusOK, memberResponse(*member, true))
+}
+
+func (s *Server) updateRoomPassword(c *gin.Context) {
+	if s.rooms == nil {
+		jsonError(c, http.StatusNotImplemented, "Room sharing is unavailable")
+		return
+	}
+	room, _, ok := s.authenticatedRoom(c)
+	if !ok {
+		return
+	}
+	var request roomPasswordRequest
+	if c.ShouldBindJSON(&request) != nil {
+		jsonError(c, http.StatusBadRequest, "Invalid room password")
+		return
+	}
+	if err := s.sharing.SetRoomPassword(c.Request.Context(), room, request.Password); err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, share.ErrInvalidRoom) {
+			status = http.StatusBadRequest
+		}
+		jsonError(c, status, "Room password must be less than 64 characters")
+		return
+	}
+	hasPassword := request.Password != ""
+	room.PasswordHash = share.TokenDigest(request.Password)
+	s.hub.Broadcast(room.ID, gin.H{"type": "room_updated", "name": room.Name, "has_password": hasPassword})
+	c.JSON(http.StatusOK, gin.H{"has_password": hasPassword})
 }
 
 func (s *Server) deleteRoom(c *gin.Context) {
@@ -162,7 +232,7 @@ func (s *Server) deleteRoom(c *gin.Context) {
 		return
 	}
 	if !member.IsOwner {
-		jsonError(c, http.StatusForbidden, "Only the room creator can delete it")
+		jsonError(c, http.StatusForbidden, "Only the room owner can delete it")
 		return
 	}
 	if err := s.rooms.DeleteRoom(c.Request.Context(), room.ID); err != nil {
@@ -268,11 +338,11 @@ func cleanRoomText(value string, limit int) string {
 	return value
 }
 func randomRoomID() (string, error) {
-	value, err := rand.Int(rand.Reader, big.NewInt(90_000_000))
+	value, err := rand.Int(rand.Reader, big.NewInt(90_000))
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%08d", value.Int64()+10_000_000), nil
+	return fmt.Sprintf("%05d", value.Int64()+10_000), nil
 }
 func randomNickname() (string, error) {
 	value, err := rand.Int(rand.Reader, big.NewInt(9000))
@@ -298,7 +368,7 @@ func (s *Server) roomResponse(room *model.ShareRoom, currentMemberID int64, now 
 		}
 		members = append(members, memberResponse(m, online))
 	}
-	return gin.H{"id": room.PublicID, "name": room.Name, "members": members, "current_member_id": currentMemberID, "current_member_found": found, "created_at": room.CreatedAt}
+	return gin.H{"id": room.PublicID, "name": room.Name, "has_password": room.PasswordHash != "", "members": members, "current_member_id": currentMemberID, "current_member_found": found, "created_at": room.CreatedAt}
 }
 func memberResponse(member model.RoomMember, online bool) gin.H {
 	return gin.H{"id": member.ID, "nickname": member.Nickname, "device": member.Device, "os": member.OS, "browser": member.Browser, "user_agent": member.UserAgent, "is_owner": member.IsOwner, "online": online, "last_seen_at": member.LastSeenAt}

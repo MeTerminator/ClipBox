@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -56,6 +57,11 @@ func (s *Server) serveRoomWebSocket(connection *websocket.Conn, publicID string)
 		if s.hub.OnlineCount(room.ID) == 0 {
 			_ = s.rooms.DeleteRoom(ctx, room.ID)
 			return
+		}
+		if member.IsOwner {
+			if _, err := s.rooms.TransferRoomOwnership(ctx, room.ID, member.ID); err != nil {
+				slog.Error("transfer room ownership", "room_id", room.PublicID, "error", err)
+			}
 		}
 		s.broadcastPresence(ctx, room.PublicID, room.ID)
 	}()

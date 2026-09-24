@@ -60,7 +60,7 @@
 
 ### 身份与授权
 
-`POST /api/rooms` 创建房间，`POST /api/rooms/:roomID/join` 加入。身份字段为 `nickname`、`device`、`os`、`browser`；创建请求还可包含 `name`。成功响应中的 `token` 只返回一次，后续 HTTP 请求使用：
+`POST /api/rooms` 创建房间，`POST /api/rooms/:roomID/join` 加入。房间与取件码共用同一个 5 位数字 ID 命名空间，服务端会原子保留 ID，避免活动房间和活动取件码重复。身份字段为 `nickname`、`device`、`os`、`browser`；创建请求还可包含 `name`；加入请求可在房间设置密码后包含 `password`（小于 64 个 Unicode 字符，支持任意字符）。成功响应中的 `token` 只返回一次，后续 HTTP 请求使用：
 
 ```text
 Authorization: Bearer <token>
@@ -69,8 +69,10 @@ Authorization: Bearer <token>
 ### 管理和历史
 
 - `GET /api/rooms/:roomID`：房间和成员状态。
-- `PATCH /api/rooms/:roomID`：创建者修改 `{ "name": "..." }`。
-- `DELETE /api/rooms/:roomID`：创建者删除房间。
+- `PATCH /api/rooms/:roomID`：任意成员修改 `{ "name": "..." }`。
+- `PATCH /api/rooms/:roomID/me`：成员修改自己的 `{ "nickname": "..." }`。
+- `PUT /api/rooms/:roomID/password`：任意成员设置或清空 `{ "password": "..." }`；空字符串清空密码。
+- `DELETE /api/rooms/:roomID`：仅房主删除房间。房主断开后若仍有成员在线，房主会按加入顺序自动转让给下一位成员。
 - `GET /api/rooms/:roomID/messages?after=<id>`：按 ID 升序返回最多 200 条后续消息。
 - `GET /api/rooms/:roomID/messages/:messageID/file`：下载房间内的文件消息。
 
@@ -89,4 +91,8 @@ Authorization: Bearer <token>
 {"type":"send","message":{"kind":"file","source":"user","file_code":"12345"}}
 ```
 
-`source` 可为 `user` 或 `clipboard`。当前剪贴板协议只接受 `kind:"text"`；以 `source:"clipboard"` 发送文件会被服务端拒绝。服务端事件包括 `ready`、`message`、`presence`、`room_updated`、`room_deleted`、`pong` 和 `error`。消息先持久化再广播，断线后可用历史接口补齐。
+`source` 可为 `user` 或 `clipboard`。当前剪贴板协议只接受 `kind:"text"`；以 `source:"clipboard"` 发送文件会被服务端拒绝。服务端事件包括 `ready`、`message`、`presence`、`member_updated`、`room_updated`、`room_deleted`、`pong` 和 `error`。消息先持久化再广播，断线后可用历史接口补齐。
+
+### 生命周期
+
+房间没有在线 WebSocket 后会立即销毁，房间消息同时删除；房间文件会保留 1 天后由清理任务删除。房主退出但房间仍有其他成员时，房主身份按成员加入顺序自动转让。

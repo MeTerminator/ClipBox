@@ -128,6 +128,92 @@ func TestGORMStoreShareRoomLifecycle(t *testing.T) {
 	}
 }
 
+func TestGORMStoreSharesFiveDigitCodeNamespace(t *testing.T) {
+	database := newSQLiteStore(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+	room := &model.ShareRoom{PublicID: "54321", Name: ""}
+	owner := &model.RoomMember{TokenHash: strings.Repeat("a", 64), Nickname: "Laptop", LastSeenAt: now}
+	if err := database.CreateRoom(ctx, room, owner); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.Create(ctx, fileClip("54321", "conflict.txt", "/tmp/conflict", hashBytes([]byte("conflict")), now, 3600)); !errors.Is(err, ErrConflict) {
+		t.Fatalf("Create() with room ID error = %v, want ErrConflict", err)
+	}
+	if err := database.DeleteRoom(ctx, room.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.Create(ctx, fileClip("54321", "reused.txt", "/tmp/reused", hashBytes([]byte("reused")), now, 3600)); err != nil {
+		t.Fatalf("Create() after room deletion: %v", err)
+	}
+}
+
+func TestGORMStoreTransfersRoomOwnershipInJoinOrder(t *testing.T) {
+	database := newSQLiteStore(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+	room := &model.ShareRoom{PublicID: "11111", Name: ""}
+	owner := &model.RoomMember{TokenHash: strings.Repeat("a", 64), Nickname: "Owner", LastSeenAt: now}
+	if err := database.CreateRoom(ctx, room, owner); err != nil {
+		t.Fatal(err)
+	}
+	phone := &model.RoomMember{TokenHash: strings.Repeat("b", 64), Nickname: "Phone", LastSeenAt: now}
+	if _, err := database.JoinRoom(ctx, room.PublicID, phone); err != nil {
+		t.Fatal(err)
+	}
+	successor, err := database.TransferRoomOwnership(ctx, room.ID, owner.ID)
+	if err != nil || successor != phone.ID {
+		t.Fatalf("TransferRoomOwnership() = %d, %v; want %d", successor, err, phone.ID)
+	}
+	updated, err := database.FindRoom(ctx, room.PublicID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(updated.Members) != 2 || updated.Members[0].IsOwner || !updated.Members[1].IsOwner {
+		t.Fatalf("owners after transfer = %#v", updated.Members)
+	}
+}
+
+func TestGORMStoreRetainsRoomFilesForOneDay(t *testing.T) {
+	database := newSQLiteStore(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+	path := filepath.Join(t.TempDir(), "room-file")
+	if err := os.WriteFile(path, []byte("room payload"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	file := &model.File{Filename: "room.txt", Path: path, SHA1: hashBytes([]byte("room payload")), Size: 12, MIMEType: "text/plain"}
+	if err := database.db.Create(file).Error; err != nil {
+		t.Fatal(err)
+	}
+	room := &model.ShareRoom{PublicID: "22222", Name: ""}
+	owner := &model.RoomMember{TokenHash: strings.Repeat("a", 64), Nickname: "Owner", LastSeenAt: now}
+	if err := database.CreateRoom(ctx, room, owner); err != nil {
+		t.Fatal(err)
+	}
+	message := &model.RoomMessage{RoomID: room.ID, MemberID: owner.ID, Kind: model.RoomMessageFile, Source: model.MessageSourceUI, FileID: &file.ID, CreatedAt: now}
+	if err := database.CreateRoomMessage(ctx, message); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.DeleteRoom(ctx, room.ID); err != nil {
+		t.Fatal(err)
+	}
+	var messageCount int64
+	if err := database.db.Model(&model.RoomMessage{}).Count(&messageCount).Error; err != nil {
+		t.Fatal(err)
+	}
+	if messageCount != 0 {
+		t.Fatalf("room messages after deletion = %d, want 0", messageCount)
+	}
+	if paths, files, err := database.CleanupRoomFileRetentions(ctx, now.Add(time.Hour)); err != nil || files != 0 || len(paths) != 0 {
+		t.Fatalf("early CleanupRoomFileRetentions() = %#v, %d, %v", paths, files, err)
+	}
+	paths, files, err := database.CleanupRoomFileRetentions(ctx, now.Add(25*time.Hour))
+	if err != nil || files != 1 || len(paths) != 1 || paths[0] != path {
+		t.Fatalf("due CleanupRoomFileRetentions() = %#v, %d, %v", paths, files, err)
+	}
+}
+
 func TestGORMStoreRollsBackFileOnCodeConflict(t *testing.T) {
 	store := newSQLiteStore(t)
 	now := time.Now().UTC()

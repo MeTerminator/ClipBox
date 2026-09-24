@@ -18,7 +18,7 @@ ClipBox is a small temporary sharing service for files, text, and links. A five-
 - Database access uses GORM. File metadata lives in a separate `cb_files` table linked from `cb_clips.file_id`.
 - New content defaults to 1,000 accesses and expires after one day. The server automatically removes expired records and unreferenced files every minute.
 - Existing `cb_clips` tables are migrated automatically, including legacy file records and missing SHA1 values.
-- Share rooms let multiple browsers exchange text and files while showing readable nickname, device, OS, and browser presence.
+- Share rooms let multiple browsers exchange text and files while showing readable nickname, device, OS, and browser presence. The home code box opens either a pickup code or a room ID; rooms join directly with a generated nickname, and nicknames can be edited after joining.
 - Room messages separate payload `kind` (`text`/`file`) from `source` (`user`/`clipboard`); the desktop client only syncs plain text through copy/paste shortcuts.
 
 ## Stack
@@ -63,7 +63,7 @@ cd ..
 go run .
 ```
 
-The first start creates `data/config.json` and the SQLite database at `data/clipbox.db`. SQLite uses a pure-Go driver, so the release binaries also work with `CGO_ENABLED=0`. ClipBox listens on `http://127.0.0.1:5328` by default. For frontend development, run `npm run dev` in `frontend/`; Vite proxies `/clip`, `/file`, and `/text` to the Go server.
+After the frontend build, `go build` produces a self-contained binary with `www/` embedded; the binary does not need a separate frontend directory at runtime. The first start creates `data/config.json` and the SQLite database at `data/clipbox.db`. SQLite uses a pure-Go driver, so the release binaries also work with `CGO_ENABLED=0`. ClipBox listens on `http://127.0.0.1:5328` by default. For frontend development, run `npm run dev` in `frontend/`; Vite proxies `/clip`, `/file`, and `/text` to the Go server.
 
 ## Desktop client
 
@@ -105,17 +105,17 @@ The default chunk size is 4 MiB, concurrency is 4, and the resume window is 10 m
 ## Share room API
 
 - `POST /api/rooms` creates a room; `POST /api/rooms/:roomID/join` joins it.
-- Room IDs are eight digits. Names are optional and can later be changed by the creator with `PATCH /api/rooms/:roomID`.
-- Rooms are ephemeral: the last WebSocket disconnect deletes the room, and background cleanup removes abandoned rooms that never established a connection.
+- Room IDs are five digits and share the same namespace as pickup codes. Names are optional and can later be changed by any member with `PATCH /api/rooms/:roomID`.
+- Rooms are ephemeral: the last WebSocket disconnect deletes messages immediately, retains room files for one day, and background cleanup removes abandoned rooms that never established a connection. When the owner leaves while others remain, ownership is transferred in join order.
 - Room calls use `Authorization: Bearer <member-token>`. Only a SHA-256 token digest is stored by the server.
 - `GET /api/rooms/:roomID/messages?after=<id>` restores persisted history after reconnecting.
 - `GET /api/rooms/:roomID/ws` opens the real-time channel. The first client frame must be `{"type":"auth","token":"..."}`; messages are sent as `{"type":"send","message":{kind,source,...}}`.
 - Text uses `{kind:"text",source,text}`; files use `{kind:"file",source:"user",file_code}` after reusing the existing upload API. The server rejects non-text messages with `source:"clipboard"`.
-- `DELETE /api/rooms/:roomID` is restricted to the room creator.
+- `DELETE /api/rooms/:roomID` is restricted to the current room owner.
 
 ## Releases
 
-The repository includes a manually triggered GitHub Actions workflow at `.github/workflows/release.yml`. Run **Build and Release** from the Actions tab to build Linux, Windows, and macOS binaries for amd64 and arm64. Each archive includes the binary, the built frontend `www/` directory, and the project documentation. The workflow publishes a release named with the Shanghai date in `YYMMDD` format and attaches a `SHA256SUMS` file.
+The repository includes a manually triggered GitHub Actions workflow at `.github/workflows/release.yml`. Run **Build and Release** from the Actions tab to build Linux, Windows, and macOS binaries for amd64 and arm64. Each archive contains a single self-contained binary with the built frontend embedded, plus project documentation. The workflow publishes a release named with the Shanghai date in `YYMMDD` format and attaches a `SHA256SUMS` file.
 
 ## Test
 

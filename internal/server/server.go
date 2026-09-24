@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"math/big"
 	"mime"
@@ -33,6 +34,7 @@ type Server struct {
 	store   store.Store
 	uploads *upload.Manager
 	router  *gin.Engine
+	www     fs.FS
 	now     func() time.Time
 	rooms   store.RoomStore
 	sharing *share.Service
@@ -47,6 +49,7 @@ type Dependencies struct {
 	Clips   store.Store     // required
 	Rooms   store.RoomStore // optional
 	Uploads *upload.Manager // required
+	WWW     fs.FS           // optional; when nil, WWWRoot is read from disk
 }
 
 type uploadInitRequest struct {
@@ -81,6 +84,7 @@ func NewWithDependencies(cfg config.Config, dependencies Dependencies) *Server {
 		cfg:     cfg,
 		store:   dependencies.Clips,
 		uploads: dependencies.Uploads,
+		www:     dependencies.WWW,
 		now:     func() time.Time { return time.Now().UTC() },
 	}
 	if dependencies.Rooms != nil {
@@ -120,6 +124,8 @@ func (s *Server) registerRoutes(router *gin.Engine) {
 	rooms.POST("/:roomID/join", s.joinRoom)
 	rooms.GET("/:roomID", s.getRoom)
 	rooms.PATCH("/:roomID", s.renameRoom)
+	rooms.PATCH("/:roomID/me", s.updateRoomNickname)
+	rooms.PUT("/:roomID/password", s.updateRoomPassword)
 	rooms.DELETE("/:roomID", s.deleteRoom)
 	rooms.GET("/:roomID/messages", s.listRoomMessages)
 	rooms.GET("/:roomID/ws", s.roomWebSocket)
@@ -444,17 +450,21 @@ func (s *Server) cleanupExpired(ctx context.Context, now time.Time) (int64, int,
 	if err != nil {
 		return 0, 0, err
 	}
-	removedFiles := 0
+	return expired, s.removeDataFiles(ctx, paths, now), nil
+}
+
+func (s *Server) removeDataFiles(ctx context.Context, paths []string, now time.Time) int {
+	removed := 0
 	for _, path := range paths {
 		count, countErr := s.store.CountFileReferences(ctx, path, now)
 		if countErr != nil || count != 0 || !s.pathInsideData(path) {
 			continue
 		}
 		if removeErr := os.Remove(path); removeErr == nil {
-			removedFiles++
+			removed++
 		}
 	}
-	return expired, removedFiles, nil
+	return removed
 }
 
 // RunCleanup removes expired clips and unreferenced files for the lifetime of
@@ -468,6 +478,19 @@ func (s *Server) RunCleanup(ctx context.Context) {
 		}
 		if expired > 0 || removedFiles > 0 {
 			slog.Info("cleaned expired clips", "clips", expired, "files", removedFiles)
+		}
+		if roomFiles, ok := s.store.(interface {
+			CleanupRoomFileRetentions(context.Context, time.Time) ([]string, int64, error)
+		}); ok {
+			paths, files, err := roomFiles.CleanupRoomFileRetentions(ctx, now.UTC())
+			if err != nil {
+				slog.Error("cleanup expired room files", "error", err)
+				return
+			}
+			removedRoomFiles := s.removeDataFiles(ctx, paths, now.UTC())
+			if files > 0 || removedRoomFiles > 0 {
+				slog.Info("cleaned expired room files", "metadata", files, "files", removedRoomFiles)
+			}
 		}
 		s.cleanupEmptyRooms(ctx, now.UTC())
 	}
@@ -585,17 +608,20 @@ func (s *Server) pathInsideData(path string) bool {
 }
 
 func (s *Server) registerFrontend(router *gin.Engine) {
+	if s.www != nil {
+		router.NoRoute(s.serveEmbeddedFrontend)
+		return
+	}
+
 	assets := filepath.Join(s.cfg.WWWRoot, "assets")
 	if info, err := os.Stat(assets); err == nil && info.IsDir() {
 		router.Static("/assets", assets)
 	}
 	router.NoRoute(func(c *gin.Context) {
-		path := c.Request.URL.Path
-		if strings.HasPrefix(path, "/api/") || strings.HasPrefix(path, "/clip/") || strings.HasPrefix(path, "/file/") || strings.HasPrefix(path, "/text/") {
-			jsonError(c, http.StatusNotFound, "Not found")
+		if s.serveAPINotFound(c) {
 			return
 		}
-		requested := filepath.Join(s.cfg.WWWRoot, filepath.FromSlash(strings.TrimPrefix(path, "/")))
+		requested := filepath.Join(s.cfg.WWWRoot, filepath.FromSlash(strings.TrimPrefix(c.Request.URL.Path, "/")))
 		if info, err := os.Stat(requested); err == nil && info.Mode().IsRegular() && pathInside(s.cfg.WWWRoot, requested) {
 			c.File(requested)
 			return
@@ -607,6 +633,37 @@ func (s *Server) registerFrontend(router *gin.Engine) {
 		}
 		c.Data(http.StatusOK, "text/plain; charset=utf-8", []byte("ClipBox-API"))
 	})
+}
+
+func (s *Server) serveEmbeddedFrontend(c *gin.Context) {
+	if s.serveAPINotFound(c) {
+		return
+	}
+	requestPath := strings.TrimPrefix(c.Request.URL.Path, "/")
+	if requestPath != "" && fs.ValidPath(requestPath) {
+		if info, err := fs.Stat(s.www, requestPath); err == nil && info.Mode().IsRegular() {
+			if strings.HasPrefix(requestPath, "assets/") {
+				c.Header("Cache-Control", "public, max-age=31536000, immutable")
+			}
+			http.FileServerFS(s.www).ServeHTTP(c.Writer, c.Request)
+			return
+		}
+	}
+	index, err := fs.ReadFile(s.www, "index.html")
+	if err != nil {
+		c.Data(http.StatusOK, "text/plain; charset=utf-8", []byte("ClipBox-API"))
+		return
+	}
+	c.Data(http.StatusOK, "text/html; charset=utf-8", index)
+}
+
+func (s *Server) serveAPINotFound(c *gin.Context) bool {
+	path := c.Request.URL.Path
+	if strings.HasPrefix(path, "/api/") || strings.HasPrefix(path, "/clip/") || strings.HasPrefix(path, "/file/") || strings.HasPrefix(path, "/text/") {
+		jsonError(c, http.StatusNotFound, "Not found")
+		return true
+	}
+	return false
 }
 
 func normalizedLimits(count, expire, defaultCount, defaultExpire int) (int, int, error) {

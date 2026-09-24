@@ -132,7 +132,6 @@ jobs:
           mkdir -p "$stage"
           CGO_ENABLED=0 GOOS="$GOOS_VALUE" GOARCH="$GOARCH_VALUE" \
             go build -trimpath -ldflags="-s -w" -o "$stage/clipbox${BINARY_EXTENSION}" .
-          cp -R www "$stage/www"
           cp LICENSE README.md README_CN.md "$stage/"
           if [[ "$PACKAGE_FORMAT" == "zip" ]]; then
             (cd dist && zip -qr "${package_name}.zip" "$package_name")

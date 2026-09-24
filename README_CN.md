@@ -18,7 +18,7 @@ ClipBox 是一个轻量的临时文件、文本和链接分享服务。用户通
 - 数据库访问基于 GORM；文件元数据由独立的 `cb_files` 表管理，`cb_clips` 通过 `file_id` 关联。
 - 新内容默认最多访问 1000 次、1 天后过期；服务端每分钟自动删除过期记录及无引用文件。
 - 现有 `cb_clips` 会自动迁移，旧文件记录和缺失的 SHA1 会在启动时回填。
-- 分享房间支持多个浏览器交换文本和文件，并以昵称、设备、系统和浏览器展示成员信息。
+- 分享房间支持多个浏览器交换文本和文件，并以昵称、设备、系统和浏览器展示成员信息。主页输入框可直接打开取件码或房间 ID；房间会使用随机昵称直接加入，昵称可在加入后修改。
 - 房间消息将载荷 `kind`（`text` / `file`）与来源 `source`（`user` / `clipboard`）分开；桌面客户端仅通过复制/粘贴快捷键同步纯文本。
 
 ## 技术栈
@@ -63,7 +63,7 @@ cd ..
 go run .
 ```
 
-首次启动会生成 `data/config.json` 和 SQLite 数据库 `data/clipbox.db`。SQLite 使用纯 Go 驱动，因此 GitHub Actions 打包的 `CGO_ENABLED=0` 二进制也可以直接使用 SQLite。默认监听 `http://127.0.0.1:5328`。前端开发时可在 `frontend/` 中运行 `npm run dev`；Vite 会把 `/clip`、`/file` 和 `/text` 代理到 Go 服务。
+前端构建完成后，`go build` 会生成内嵌 `www/` 的独立二进制文件，运行时不再需要单独部署前端目录。首次启动会生成 `data/config.json` 和 SQLite 数据库 `data/clipbox.db`。SQLite 使用纯 Go 驱动，因此 GitHub Actions 打包的 `CGO_ENABLED=0` 二进制也可以直接使用 SQLite。默认监听 `http://127.0.0.1:5328`。前端开发时可在 `frontend/` 中运行 `npm run dev`；Vite 会把 `/clip`、`/file` 和 `/text` 代理到 Go 服务。
 
 ## 桌面客户端
 
@@ -112,17 +112,17 @@ VITE_API_ORIGIN=https://clipbox.example.com npm run desktop:build
 ## 分享房间接口
 
 - `POST /api/rooms` 创建房间，`POST /api/rooms/:roomID/join` 加入房间。
-- 房间 ID 为 8 位数字；房间名称可留空，创建者之后可通过 `PATCH /api/rooms/:roomID` 修改。
-- 房间是临时的：最后一个 WebSocket 客户端断开后立即删除；从未成功建立连接的遗留房间由后台清理。
+- 房间 ID 为 5 位数字，并与取件码共用命名空间；房间名称可留空，任意成员之后可通过 `PATCH /api/rooms/:roomID` 修改。
+- 房间是临时的：最后一个 WebSocket 客户端断开后，消息立即删除，房间文件保留 1 天后清理；从未成功建立连接的遗留房间由后台清理。房主退出但仍有其他成员时，房主身份按加入顺序自动转让。
 - 房间接口使用 `Authorization: Bearer <member-token>`；服务端只保存令牌的 SHA-256 摘要。
 - `GET /api/rooms/:roomID/messages?after=<id>` 用于断线重连后恢复已持久化的历史消息。
 - `GET /api/rooms/:roomID/ws` 建立实时通道；客户端首帧必须为 `{"type":"auth","token":"..."}`，发送消息使用 `{"type":"send","message":{kind,source,...}}`。
 - 文本载荷为 `{kind:"text",source,text}`；文件先复用现有上传接口，再发送 `{kind:"file",source:"user",file_code}`。当前服务端拒绝 `source:"clipboard"` 的非文本消息。
-- `DELETE /api/rooms/:roomID` 仅允许房间创建者调用。
+- `DELETE /api/rooms/:roomID` 仅允许当前房主调用。
 
 ## 发布版本
 
-仓库内置了手动触发的 GitHub Actions 工作流 `.github/workflows/release.yml`。在 Actions 页面运行 **Build and Release**，即可构建 Linux、Windows、macOS 的 amd64 和 arm64 版本。每个压缩包都包含对应二进制文件、构建后的 `www/` 前端目录和项目文档。工作流会按上海时区以 `YYMMDD` 格式创建 Release，并附带 `SHA256SUMS` 校验文件。
+仓库内置了手动触发的 GitHub Actions 工作流 `.github/workflows/release.yml`。在 Actions 页面运行 **Build and Release**，即可构建 Linux、Windows、macOS 的 amd64 和 arm64 版本。每个压缩包都包含一个内嵌前端的独立二进制文件和项目文档。工作流会按上海时区以 `YYMMDD` 格式创建 Release，并附带 `SHA256SUMS` 校验文件。
 
 ## 测试
 

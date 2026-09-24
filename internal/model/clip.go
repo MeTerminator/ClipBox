@@ -44,15 +44,16 @@ func (File) TableName() string { return "cb_files" }
 
 // ShareRoom is a persistent, browser-to-browser conversation. The public ID
 // is intentionally separate from the numeric primary key so it is safe to put
-// in URLs and can be regenerated on collision.
+// in URLs. It shares the five-digit code namespace with clips through SharedCode.
 type ShareRoom struct {
-	ID        int64         `gorm:"primaryKey;autoIncrement"`
-	PublicID  string        `gorm:"type:varchar(16);not null;uniqueIndex:idx_cb_share_rooms_public_id"`
-	Name      string        `gorm:"type:varchar(80);not null"`
-	Members   []RoomMember  `gorm:"foreignKey:RoomID;constraint:OnDelete:CASCADE"`
-	Messages  []RoomMessage `gorm:"foreignKey:RoomID;constraint:OnDelete:CASCADE"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID           int64         `gorm:"primaryKey;autoIncrement"`
+	PublicID     string        `gorm:"type:varchar(16);not null;uniqueIndex:idx_cb_share_rooms_public_id"`
+	Name         string        `gorm:"type:varchar(80);not null"`
+	PasswordHash string        `gorm:"type:char(64)"`
+	Members      []RoomMember  `gorm:"foreignKey:RoomID;constraint:OnDelete:CASCADE"`
+	Messages     []RoomMessage `gorm:"foreignKey:RoomID;constraint:OnDelete:CASCADE"`
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 func (ShareRoom) TableName() string { return "cb_share_rooms" }
@@ -100,6 +101,29 @@ type RoomMessage struct {
 }
 
 func (RoomMessage) TableName() string { return "cb_room_messages" }
+
+// SharedCode reserves the finite five-digit identifier namespace used by both
+// pickup clips and share rooms. The unique primary key gives allocation an
+// atomic conflict signal even though clips and rooms live in different tables.
+type SharedCode struct {
+	Code      string `gorm:"primaryKey;type:varchar(10)"`
+	Kind      string `gorm:"type:varchar(20);not null"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (SharedCode) TableName() string { return "cb_shared_codes" }
+
+// RoomFileRetention keeps room file metadata for one day after a room is
+// destroyed, then allows the cleanup job to remove unreferenced bytes.
+type RoomFileRetention struct {
+	FileID      int64     `gorm:"primaryKey"`
+	DeleteAfter time.Time `gorm:"index:idx_cb_room_file_retentions_delete_after"`
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+func (RoomFileRetention) TableName() string { return "cb_room_file_retentions" }
 
 // Expired reports whether the clip is unusable at now due to its lifetime.
 func (clip Clip) Expired(now time.Time) bool {

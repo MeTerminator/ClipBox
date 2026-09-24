@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/MeTerminator/ClipBox/internal/config"
@@ -115,6 +116,56 @@ func (m *memoryStore) CountFileReferences(_ context.Context, path string, now ti
 	return count, nil
 }
 func (m *memoryStore) Close() error { return nil }
+
+func TestEmbeddedFrontendIsServedFromBinary(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	dataDir := t.TempDir()
+	uploads, err := upload.NewManager(dataDir, 1024, 1024*1024, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	frontend := fstest.MapFS{
+		"index.html":    &fstest.MapFile{Data: []byte("<html>embedded ClipBox</html>")},
+		"assets/app.js": &fstest.MapFile{Data: []byte("console.log('ClipBox')")},
+		"favicon.svg":   &fstest.MapFile{Data: []byte("<svg></svg>")},
+	}
+	application := NewWithDependencies(config.Config{DataDir: dataDir, WWWRoot: filepath.Join(dataDir, "missing")}, Dependencies{
+		Clips:   &memoryStore{clips: make(map[string]*model.Clip)},
+		Uploads: uploads,
+		WWW:     frontend,
+	})
+	httpServer := httptest.NewServer(application.Handler())
+	defer httpServer.Close()
+
+	for path, want := range map[string]string{
+		"/":              "<html>embedded ClipBox</html>",
+		"/rooms":         "<html>embedded ClipBox</html>",
+		"/assets/app.js": "console.log('ClipBox')",
+		"/favicon.svg":   "<svg></svg>",
+	} {
+		response, err := http.Get(httpServer.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, readErr := io.ReadAll(response.Body)
+		_ = response.Body.Close()
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		if response.StatusCode != http.StatusOK || !strings.Contains(string(body), want) {
+			t.Fatalf("GET %s = %d %q, want 200 containing %q", path, response.StatusCode, body, want)
+		}
+	}
+
+	response, err := http.Get(httpServer.URL + "/api/not-found")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusNotFound {
+		t.Fatalf("embedded API fallback status = %d, want 404", response.StatusCode)
+	}
+}
 
 func TestPickupRedirectsToStableSHA1Routes(t *testing.T) {
 	gin.SetMode(gin.TestMode)

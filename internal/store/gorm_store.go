@@ -109,11 +109,14 @@ func (s *GORMStore) Close() error {
 
 func (s *GORMStore) migrate(ctx context.Context) error {
 	db := s.db.WithContext(ctx)
-	if err := db.AutoMigrate(&model.File{}, &model.Clip{}, &model.ShareRoom{}, &model.RoomMember{}, &model.RoomMessage{}); err != nil {
+	if err := db.AutoMigrate(&model.File{}, &model.Clip{}, &model.ShareRoom{}, &model.RoomMember{}, &model.RoomMessage{}, &model.SharedCode{}, &model.RoomFileRetention{}); err != nil {
 		return fmt.Errorf("migrate database schema: %w", err)
 	}
 	if err := s.backfillTextSHA1(ctx); err != nil {
 		return fmt.Errorf("backfill text SHA1: %w", err)
+	}
+	if err := s.backfillSharedCodes(ctx); err != nil {
+		return fmt.Errorf("backfill shared codes: %w", err)
 	}
 
 	// GORM deliberately keeps legacy columns on upgraded installations. Once
@@ -240,6 +243,9 @@ func (s *GORMStore) Create(ctx context.Context, clip *model.Clip) error {
 		clip.FileID = nil
 	}
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := reserveSharedCode(tx, clip.Code, "clip"); err != nil {
+			return err
+		}
 		if clip.ContentType == model.ContentFile {
 			if file == nil {
 				return fmt.Errorf("file clip has no file metadata")
@@ -318,6 +324,32 @@ func (s *GORMStore) FindFile(ctx context.Context, hash, filename string, now tim
 		Order("cb_clips.created_at DESC").Limit(20), now)
 }
 
+func (s *GORMStore) backfillSharedCodes(ctx context.Context) error {
+	db := s.db.WithContext(ctx)
+	now := time.Now().UTC()
+	return db.Transaction(func(tx *gorm.DB) error {
+		var clips []model.Clip
+		if err := tx.Select("code").Find(&clips).Error; err != nil {
+			return err
+		}
+		var rooms []model.ShareRoom
+		if err := tx.Select("public_id").Find(&rooms).Error; err != nil {
+			return err
+		}
+		reservations := make([]model.SharedCode, 0, len(clips)+len(rooms))
+		for _, clip := range clips {
+			reservations = append(reservations, model.SharedCode{Code: clip.Code, Kind: "clip", CreatedAt: now, UpdatedAt: now})
+		}
+		for _, room := range rooms {
+			reservations = append(reservations, model.SharedCode{Code: room.PublicID, Kind: "room", CreatedAt: now, UpdatedAt: now})
+		}
+		if len(reservations) == 0 {
+			return nil
+		}
+		return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&reservations).Error
+	})
+}
+
 func (s *GORMStore) FindReusableFile(ctx context.Context, hash string, size int64, now time.Time) (*model.Clip, error) {
 	return s.findActive(s.db.WithContext(ctx).
 		Joins("JOIN cb_files ON cb_files.id = cb_clips.file_id").
@@ -343,17 +375,19 @@ func (s *GORMStore) CleanupExpired(ctx context.Context, now time.Time) ([]string
 	var expiredCount int64
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var candidates []model.Clip
-		if err := tx.Select("id", "file_id", "created_at", "expire_seconds").Find(&candidates).Error; err != nil {
+		if err := tx.Select("id", "code", "file_id", "created_at", "expire_seconds").Find(&candidates).Error; err != nil {
 			return err
 		}
 
 		expiredIDs := make([]int64, 0)
+		expiredCodes := make([]string, 0)
 		fileIDs := make(map[int64]struct{})
 		for _, clip := range candidates {
 			if !clip.Expired(now) {
 				continue
 			}
 			expiredIDs = append(expiredIDs, clip.ID)
+			expiredCodes = append(expiredCodes, clip.Code)
 			if clip.FileID != nil {
 				fileIDs[*clip.FileID] = struct{}{}
 			}
@@ -367,6 +401,9 @@ func (s *GORMStore) CleanupExpired(ctx context.Context, now time.Time) ([]string
 			return result.Error
 		}
 		expiredCount = result.RowsAffected
+		if err := tx.Where("code IN ?", expiredCodes).Delete(&model.SharedCode{}).Error; err != nil {
+			return err
+		}
 
 		for fileID := range fileIDs {
 			var references int64
@@ -403,6 +440,60 @@ func (s *GORMStore) CleanupExpired(ctx context.Context, now time.Time) ([]string
 	return paths, expiredCount, nil
 }
 
+func (s *GORMStore) CleanupRoomFileRetentions(ctx context.Context, now time.Time) ([]string, int64, error) {
+	var paths []string
+	var removedFiles int64
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var retentions []model.RoomFileRetention
+		if err := tx.Where("delete_after <= ?", now).Find(&retentions).Error; err != nil {
+			return err
+		}
+		for _, retention := range retentions {
+			var references int64
+			if err := tx.Model(&model.Clip{}).Where("file_id = ?", retention.FileID).Count(&references).Error; err != nil {
+				return err
+			}
+			if references == 0 {
+				if err := tx.Model(&model.RoomMessage{}).Where("file_id = ?", retention.FileID).Count(&references).Error; err != nil {
+					return err
+				}
+			}
+			if references != 0 {
+				// The file was reused by a still-live clip or room; a future room
+				// deletion will create a fresh retention when it is needed.
+				if err := tx.Delete(&model.RoomFileRetention{}, retention.FileID).Error; err != nil {
+					return err
+				}
+				continue
+			}
+			var file model.File
+			if err := tx.First(&file, retention.FileID).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					continue
+				}
+				return err
+			}
+			var samePath int64
+			if err := tx.Model(&model.File{}).Where("path = ?", file.Path).Count(&samePath).Error; err != nil {
+				return err
+			}
+			if err := tx.Delete(&model.File{}, retention.FileID).Error; err != nil {
+				return err
+			}
+			removedFiles++
+			if samePath <= 1 {
+				paths = append(paths, file.Path)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+	sort.Strings(paths)
+	return compactStrings(paths), removedFiles, nil
+}
+
 func (s *GORMStore) CountFileReferences(ctx context.Context, path string, now time.Time) (int, error) {
 	var clips []model.Clip
 	if err := s.db.WithContext(ctx).
@@ -430,6 +521,18 @@ func (s *GORMStore) CountFileReferences(ctx context.Context, path string, now ti
 		count += int(messageReferences)
 	}
 	return count, nil
+}
+
+func reserveSharedCode(tx *gorm.DB, code, kind string) error {
+	reservation := model.SharedCode{Code: code, Kind: kind, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+	result := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&reservation)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrConflict
+	}
+	return nil
 }
 
 func normalizeNotFound(err error) error {

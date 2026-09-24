@@ -41,6 +41,7 @@ __pycache__
 # Project specific files
 data/
 www
+/clipbox
 
 # Logs
 logs

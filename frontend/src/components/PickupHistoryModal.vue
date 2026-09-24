@@ -3,29 +3,36 @@
     <DialogContent class="sm:max-w-xl">
       <DialogHeader>
         <DialogTitle>{{ t("home.pickupHistory") }}</DialogTitle>
-        <DialogDescription>{{ t("home.pickupSubtitle") }}</DialogDescription>
+        <DialogDescription>{{ t("home.pickupHistorySubtitle") }}</DialogDescription>
       </DialogHeader>
 
       <ScrollArea class="max-h-[60vh] pr-3">
         <div v-if="records.length" class="space-y-2">
           <Button
             v-for="record in records"
-            :key="`${record.code}-${record.retrievedAt}`"
+            :key="record.kind === 'room' ? `room-${record.id}` : `clip-${record.code}-${record.retrievedAt}`"
             variant="outline"
             class="h-auto w-full justify-start px-4 py-3 text-left"
             @click="emit('select', record)"
           >
-            <FileIcon v-if="record.type === 'file'" />
+            <MessagesSquareIcon v-if="record.kind === 'room'" />
+            <FileIcon v-else-if="record.type === 'file'" />
             <LinkIcon v-else-if="record.type === 'link'" />
             <FileTextIcon v-else />
             <span class="min-w-0 flex-1">
               <span class="block truncate font-medium">
-                {{ record.filename || typeLabel(record.type) }}
+                {{ record.kind === "room" ? record.name || t("rooms.unnamed") : record.filename || typeLabel(record.type) }}
               </span>
-              <span class="block text-xs text-muted-foreground">
+              <span v-if="record.kind === 'room'" class="block text-xs text-muted-foreground">
+                {{ record.id }} · {{ record.nickname }} · {{ formatDate(record.joinedAt) }}
+              </span>
+              <span v-else class="block text-xs text-muted-foreground">
                 {{ record.code }} · {{ formatDate(record.retrievedAt) }}
               </span>
             </span>
+            <Badge v-if="record.kind === 'room' && record.isOwner" variant="secondary">
+              {{ t("rooms.owner") }}
+            </Badge>
             <ChevronRightIcon class="text-muted-foreground" />
           </Button>
         </div>
@@ -45,7 +52,8 @@
 
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
-import { ChevronRightIcon, FileIcon, FileTextIcon, LinkIcon } from "@lucide/vue";
+import { ChevronRightIcon, FileIcon, FileTextIcon, LinkIcon, MessagesSquareIcon } from "@lucide/vue";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -56,16 +64,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { ClipKind, ClipRecord } from "@/types";
+import type { ClipKind, PickupHistoryRecord } from "@/types";
 
-withDefaults(defineProps<{ open?: boolean; records?: ClipRecord[] }>(), {
+withDefaults(defineProps<{ open?: boolean; records?: PickupHistoryRecord[] }>(), {
   open: false,
   records: () => [],
 });
 
 const emit = defineEmits<{
   close: [];
-  select: [record: ClipRecord];
+  select: [record: PickupHistoryRecord];
   clear: [];
 }>();
 const { t, locale } = useI18n();

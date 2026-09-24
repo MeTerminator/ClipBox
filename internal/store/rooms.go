@@ -7,10 +7,14 @@ import (
 
 	"github.com/MeTerminator/ClipBox/internal/model"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func (s *GORMStore) CreateRoom(ctx context.Context, room *model.ShareRoom, owner *model.RoomMember) error {
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := reserveSharedCode(tx, room.PublicID, "room"); err != nil {
+			return err
+		}
 		if err := tx.Omit("Members", "Messages").Create(room).Error; err != nil {
 			return err
 		}
@@ -67,12 +71,59 @@ func (s *GORMStore) UpdateRoomName(ctx context.Context, roomID int64, name strin
 	return s.db.WithContext(ctx).Model(&model.ShareRoom{}).Where("id = ?", roomID).Update("name", name).Error
 }
 
+func (s *GORMStore) UpdateRoomPassword(ctx context.Context, roomID int64, passwordHash string) error {
+	return s.db.WithContext(ctx).Model(&model.ShareRoom{}).Where("id = ?", roomID).Update("password_hash", passwordHash).Error
+}
+
+func (s *GORMStore) UpdateRoomMemberNickname(ctx context.Context, memberID int64, nickname string) error {
+	return s.db.WithContext(ctx).Model(&model.RoomMember{}).Where("id = ?", memberID).Update("nickname", nickname).Error
+}
+
+func (s *GORMStore) TransferRoomOwnership(ctx context.Context, roomID, fromMemberID int64) (int64, error) {
+	var successorID int64
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&model.RoomMember{}).Where("id = ?", fromMemberID).Update("is_owner", false).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&model.RoomMember{}).
+			Where("room_id = ? AND id <> ? AND is_owner = false", roomID, fromMemberID).
+			Order("created_at ASC, id ASC").
+			Clauses(clause.Locking{Strength: "UPDATE"}).
+			Limit(1).
+			Pluck("id", &successorID).Error; err != nil {
+			return err
+		}
+		if successorID == 0 {
+			return nil
+		}
+		return tx.Model(&model.RoomMember{}).Where("id = ?", successorID).Update("is_owner", true).Error
+	})
+	return successorID, err
+}
+
 func (s *GORMStore) DeleteRoom(ctx context.Context, roomID int64) error {
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var fileIDValues []*int64
+		if err := tx.Model(&model.RoomMessage{}).Where("room_id = ? AND file_id IS NOT NULL", roomID).Distinct().Pluck("file_id", &fileIDValues).Error; err != nil {
+			return err
+		}
+		fileIDs := make([]int64, 0, len(fileIDValues))
+		for _, fileID := range fileIDValues {
+			if fileID != nil {
+				fileIDs = append(fileIDs, *fileID)
+			}
+		}
+		var room model.ShareRoom
+		if err := tx.Where("id = ?", roomID).First(&room).Error; err != nil {
+			return normalizeNotFound(err)
+		}
 		if err := tx.Where("room_id = ?", roomID).Delete(&model.RoomMessage{}).Error; err != nil {
 			return err
 		}
 		if err := tx.Where("room_id = ?", roomID).Delete(&model.RoomMember{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("code = ?", room.PublicID).Delete(&model.SharedCode{}).Error; err != nil {
 			return err
 		}
 		result := tx.Delete(&model.ShareRoom{}, roomID)
@@ -81,6 +132,22 @@ func (s *GORMStore) DeleteRoom(ctx context.Context, roomID int64) error {
 		}
 		if result.RowsAffected == 0 {
 			return ErrNotFound
+		}
+		deleteAfter := time.Now().UTC().Add(24 * time.Hour)
+		for _, fileID := range fileIDs {
+			if fileID == 0 {
+				continue
+			}
+			retention := model.RoomFileRetention{FileID: fileID, DeleteAfter: deleteAfter, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+			result := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&retention)
+			if result.Error != nil {
+				return result.Error
+			}
+			if result.RowsAffected == 0 {
+				if err := tx.Model(&model.RoomFileRetention{}).Where("file_id = ? AND delete_after < ?", fileID, deleteAfter).Update("delete_after", deleteAfter).Error; err != nil {
+					return err
+				}
+			}
 		}
 		return nil
 	})

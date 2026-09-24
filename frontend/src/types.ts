@@ -1,6 +1,7 @@
 export type ClipKind = "text" | "text/plain" | "link" | "file";
 
 export interface ClipRecord {
+  kind?: "clip";
   code: string;
   type: ClipKind;
   content?: string;
@@ -32,6 +33,7 @@ export interface RoomMember {
 export interface RoomInfo {
   id: string;
   name: string;
+  has_password?: boolean;
   members: RoomMember[];
   current_member_id: number;
   created_at: string;
@@ -47,7 +49,23 @@ export interface SavedRoom {
   name: string;
   nickname: string;
   token: string;
+  isOwner?: boolean;
+  hasPassword?: boolean;
+  joinedAt?: string;
 }
+
+export interface RoomHistoryRecord {
+  kind: "room";
+  id: string;
+  name: string;
+  nickname: string;
+  token: string;
+  isOwner: boolean;
+  hasPassword: boolean;
+  joinedAt: string;
+}
+
+export type PickupHistoryRecord = ClipRecord | RoomHistoryRecord;
 
 export interface RoomFile {
   name: string;

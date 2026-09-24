@@ -49,8 +49,8 @@ func TestRoomWebSocketBroadcastsAndPersistsMessages(t *testing.T) {
 	defer httpServer.Close()
 
 	owner := postRoomJSON(t, httpServer.URL+"/api/rooms", `{"name":"","nickname":"","device":"Desktop","os":"macOS","browser":"Safari"}`)
-	if !regexp.MustCompile(`^\d{8}$`).MatchString(owner.Room.ID) {
-		t.Fatalf("room ID = %q, want eight digits", owner.Room.ID)
+	if !regexp.MustCompile(`^\d{5}$`).MatchString(owner.Room.ID) {
+		t.Fatalf("room ID = %q, want five digits", owner.Room.ID)
 	}
 	if owner.Room.Name != "" {
 		t.Fatalf("empty room name became %q", owner.Room.Name)
@@ -120,6 +120,76 @@ func TestRoomWebSocketBroadcastsAndPersistsMessages(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatalf("room %s still exists after its last client disconnected", owner.Room.ID)
+}
+
+func TestRoomPasswordAndMemberUpdates(t *testing.T) {
+	dataDir := t.TempDir()
+	database, err := store.Open(context.Background(), "sqlite", filepath.Join(dataDir, "clipbox.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	uploads, err := upload.NewManager(dataDir, 1024, 1024*1024, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := config.Config{DataDir: dataDir, WWWRoot: filepath.Join(dataDir, "missing"), RealIPHeader: "X-Real-IP", MaxTextSize: 1024, MaxLinkLength: 2048, MaxUploadFileSize: 1024 * 1024, UploadChunkSize: 1024, UploadSessionTTL: time.Minute, UploadWorkers: 1}
+	application := New(cfg, database, uploads)
+	httpServer := httptest.NewServer(application.Handler())
+	defer httpServer.Close()
+
+	owner := postRoomJSON(t, httpServer.URL+"/api/rooms", `{"name":"","nickname":"Owner","device":"Desktop","os":"macOS","browser":"Safari"}`)
+	passwordRequest, _ := http.NewRequest(http.MethodPut, httpServer.URL+"/api/rooms/"+owner.Room.ID+"/password", bytes.NewBufferString(`{"password":"a b😀"}`))
+	passwordRequest.Header.Set("Content-Type", "application/json")
+	passwordRequest.Header.Set("Authorization", "Bearer "+owner.Token)
+	passwordResponse, err := http.DefaultClient.Do(passwordRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	passwordResponse.Body.Close()
+	if passwordResponse.StatusCode != http.StatusOK {
+		t.Fatalf("set password status = %d", passwordResponse.StatusCode)
+	}
+
+	wrongResponse, err := http.Post(httpServer.URL+"/api/rooms/"+owner.Room.ID+"/join", "application/json", bytes.NewBufferString(`{"nickname":"Phone"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wrongResponse.Body.Close()
+	if wrongResponse.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("join without password status = %d, want 401", wrongResponse.StatusCode)
+	}
+	member := postRoomJSON(t, httpServer.URL+"/api/rooms/"+owner.Room.ID+"/join", `{"nickname":"Phone","password":"a b😀","device":"Phone","os":"iOS","browser":"Safari"}`)
+
+	renameRequest, _ := http.NewRequest(http.MethodPatch, httpServer.URL+"/api/rooms/"+owner.Room.ID, bytes.NewBufferString(`{"name":"Member renamed"}`))
+	renameRequest.Header.Set("Content-Type", "application/json")
+	renameRequest.Header.Set("Authorization", "Bearer "+member.Token)
+	renameResponse, err := http.DefaultClient.Do(renameRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	renameResponse.Body.Close()
+	if renameResponse.StatusCode != http.StatusOK {
+		t.Fatalf("member rename status = %d", renameResponse.StatusCode)
+	}
+
+	nicknameRequest, _ := http.NewRequest(http.MethodPatch, httpServer.URL+"/api/rooms/"+owner.Room.ID+"/me", bytes.NewBufferString(`{"nickname":"New nickname"}`))
+	nicknameRequest.Header.Set("Content-Type", "application/json")
+	nicknameRequest.Header.Set("Authorization", "Bearer "+member.Token)
+	nicknameResponse, err := http.DefaultClient.Do(nicknameRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer nicknameResponse.Body.Close()
+	if nicknameResponse.StatusCode != http.StatusOK {
+		t.Fatalf("nickname status = %d", nicknameResponse.StatusCode)
+	}
+	var payload struct {
+		Nickname string `json:"nickname"`
+	}
+	if err := json.NewDecoder(nicknameResponse.Body).Decode(&payload); err != nil || payload.Nickname != "New nickname" {
+		t.Fatalf("nickname response = %#v, %v", payload, err)
+	}
 }
 
 func postRoomJSON(t *testing.T, url, payload string) roomSessionPayload {

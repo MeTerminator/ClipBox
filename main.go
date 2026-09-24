@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"embed"
 	"errors"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
@@ -16,7 +18,19 @@ import (
 	"github.com/MeTerminator/ClipBox/internal/upload"
 )
 
+// The production frontend is built into www/ by `npm run build` and embedded
+// here so a single Go binary can serve the complete application.
+//
+//go:embed all:www
+var embeddedFrontendRoot embed.FS
+
 func main() {
+	frontend, err := fs.Sub(embeddedFrontendRoot, "www")
+	if err != nil {
+		slog.Error("initialize embedded frontend", "error", err)
+		os.Exit(1)
+	}
+
 	cfg, err := config.Load()
 	if err != nil {
 		slog.Error("load configuration", "error", err)
@@ -44,6 +58,7 @@ func main() {
 		Clips:   database,
 		Rooms:   database,
 		Uploads: uploadManager,
+		WWW:     frontend,
 	})
 	go application.RunCleanup(ctx)
 	httpServer := &http.Server{

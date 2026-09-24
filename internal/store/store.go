@@ -35,6 +35,9 @@ type RoomStore interface {
 	ListRooms(context.Context) ([]model.ShareRoom, error)
 	FindRoomMember(context.Context, int64, string) (*model.RoomMember, error)
 	UpdateRoomName(context.Context, int64, string) error
+	UpdateRoomPassword(context.Context, int64, string) error
+	UpdateRoomMemberNickname(context.Context, int64, string) error
+	TransferRoomOwnership(context.Context, int64, int64) (int64, error)
 	TouchRoomMember(context.Context, int64, time.Time) error
 	DeleteRoom(context.Context, int64) error
 	CreateRoomMessage(context.Context, *model.RoomMessage) error
