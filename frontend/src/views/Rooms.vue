@@ -154,7 +154,7 @@ import { useI18n } from "vue-i18n";
 import { toast } from "vue-sonner";
 import { useFileUpload } from "@/composables/useFileUpload";
 import { setRoomFileDropHandler } from "@/composables/fileDropTarget";
-import { backendOrigin, backendURL, backendWebSocketURL } from "@/lib/backend";
+import { backendOrigin, backendURL, backendWebSocketURL, uploadBackendURL } from "@/lib/backend";
 import { isDesktopClient, listenForDesktopCopies, setDesktopSharedText } from "@/lib/desktop";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -277,7 +277,31 @@ function sendMessage(payload: object) { sendSocket({ type: "send", message: payl
 function sendText() { const text = draft.value.trim(); if (!text || busy.value) return; try { sendMessage({ kind: "text", source: "user", text }); draft.value = ""; } catch (error) { toast.error(errorMessage(error)); } }
 async function processRoomFile(file: File) { if (busy.value) return; if (!connected.value) { toast.error(t("rooms.unknownError")); return; } busy.value = true; resetUploadProgress(); try { const result = await uploadFile(file, { count: 1000, expire: 31536000 }); sendMessage({ kind: "file", source: "user", file_code: result.code }); } catch (error) { toast.error(errorMessage(error)); } finally { busy.value = false; resetUploadProgress(); } }
 async function sendFile(event: Event) { const input = event.target as HTMLInputElement; const file = input.files?.[0]; input.value = ""; if (file) await processRoomFile(file); }
-async function downloadFile(message: RoomMessage) { if (!message.file || !session.value) return; try { const response = await fetch(backendURL(message.file.download_url), { headers: { Authorization: `Bearer ${session.value.token}` } }); if (!response.ok) throw new Error(t("rooms.unknownError")); const url = URL.createObjectURL(await response.blob()); const link = document.createElement("a"); link.href = url; link.download = message.file.name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); } catch (error) { toast.error(errorMessage(error)); } }
+async function downloadFile(message: RoomMessage) {
+  if (!message.file || !session.value) return;
+  try {
+    const headers = { Authorization: `Bearer ${session.value.token}` };
+    const directURL = await uploadBackendURL(message.file.download_url);
+    let response: Response;
+    try {
+      response = await fetch(directURL, { headers });
+    } catch {
+      response = await fetch(backendURL(message.file.download_url), { headers });
+    }
+    if (!response.ok && directURL !== backendURL(message.file.download_url)) {
+      response = await fetch(backendURL(message.file.download_url), { headers });
+    }
+    if (!response.ok) throw new Error(t("rooms.unknownError"));
+    const url = URL.createObjectURL(await response.blob());
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = message.file.name;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (error) {
+    toast.error(errorMessage(error));
+  }
+}
 async function copyInvite() { if (!session.value) return; await navigator.clipboard.writeText(`${backendOrigin}/rooms/${session.value.room.id}`); toast.success(t("rooms.copied")); }
 async function copyRoomID() { if (!session.value) return; await navigator.clipboard.writeText(session.value.room.id); toast.success(t("rooms.roomIDCopied")); }
 async function deleteRoom() { if (!session.value) return; try { await request<void>(`/api/rooms/${session.value.room.id}`, { method: "DELETE" }); leaveRoom(); } catch (error) { toast.error(error instanceof HTTPError && error.status === 403 ? t("rooms.onlyOwner") : errorMessage(error)); } }

@@ -114,6 +114,7 @@ func (s *Server) registerRoutes(router *gin.Engine) {
 
 	uploads := clips.Group("/upload")
 	uploads.POST("/init", s.initUpload)
+	uploads.GET("/__direct_probe__", s.uploadDirectProbe)
 	uploads.GET("/:uploadID", s.uploadStatus)
 	uploads.PUT("/:uploadID/:chunk", s.uploadChunk)
 	uploads.POST("/:uploadID/complete", s.completeUpload)
@@ -132,6 +133,10 @@ func (s *Server) registerRoutes(router *gin.Engine) {
 	rooms.GET("/:roomID/messages", s.listRoomMessages)
 	rooms.GET("/:roomID/ws", s.roomWebSocket)
 	rooms.GET("/:roomID/messages/:messageID/file", s.downloadRoomFile)
+}
+
+func (s *Server) uploadDirectProbe(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"direct_upload": true})
 }
 
 func (s *Server) cors() gin.HandlerFunc {

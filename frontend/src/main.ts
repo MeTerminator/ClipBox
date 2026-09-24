@@ -4,6 +4,7 @@ import "./style.css";
 import App from "./App.vue";
 import router from "./router";
 import i18n from "./i18n";
+import { initializeUploadRoute } from "./lib/backend";
 import { registerSW } from "virtual:pwa-register";
 
 if (!("__TAURI_INTERNALS__" in window)) {
@@ -15,4 +16,5 @@ if (!("__TAURI_INTERNALS__" in window)) {
   });
 }
 
+void initializeUploadRoute();
 createApp(App).use(router).use(i18n).mount("#app");

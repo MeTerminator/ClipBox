@@ -12,6 +12,10 @@
 
 返回前端上传路由选择所需的公开配置：`site_url` 和 `upload_direct_first`。该接口不包含数据库等服务端敏感配置。
 
+### `GET /api/clip/upload/__direct_probe__`
+
+专用于浏览器判断源站上传 API 是否可达，成功返回 `200 {"direct_upload":true}`。该端点固定允许跨域。
+
 ## Clip
 
 ### `POST /api/clip/create`

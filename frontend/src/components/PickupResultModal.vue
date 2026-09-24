@@ -53,7 +53,7 @@
           </div>
         </div>
         <Button as-child class="w-full">
-          <a :href="result.download_url" download>
+          <a :href="downloadURL || result.download_url" download>
             <DownloadIcon />
             {{ t("home.downloadFile") }}
           </a>
@@ -64,7 +64,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { CopyIcon, DownloadIcon, FileIcon, FileTextIcon, LinkIcon } from "@lucide/vue";
 import { Button } from "@/components/ui/button";
@@ -79,6 +79,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ClipRecord } from "@/types";
+import { uploadBackendURL } from "@/lib/backend";
 
 const props = withDefaults(defineProps<{ open?: boolean; result?: ClipRecord | null }>(), {
   open: false,
@@ -86,6 +87,14 @@ const props = withDefaults(defineProps<{ open?: boolean; result?: ClipRecord | n
 });
 const emit = defineEmits<{ close: []; copied: [] }>();
 const { t, locale } = useI18n();
+const downloadURL = ref("");
+
+watch(() => props.result?.download_url, async (path) => {
+  downloadURL.value = "";
+  if (!path) return;
+  const resolved = await uploadBackendURL(path);
+  if (props.result?.download_url === path) downloadURL.value = resolved;
+}, { immediate: true });
 
 const resultTitle = computed(() => {
   if (props.result?.type === "link") return t("home.linkResult");

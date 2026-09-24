@@ -541,6 +541,21 @@ func TestUploadRoutesAlwaysAllowCrossOrigin(t *testing.T) {
 	}
 }
 
+func TestUploadDirectProbeReturnsExplicitSuccess(t *testing.T) {
+	application := NewWithDependencies(config.Config{WWWRoot: t.TempDir()}, Dependencies{})
+	request := httptest.NewRequest(http.MethodGet, "/api/clip/upload/__direct_probe__", nil)
+	request.Header.Set("Origin", "https://frontend.internal")
+	response := httptest.NewRecorder()
+	application.Handler().ServeHTTP(response, request)
+	var result map[string]bool
+	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if response.Code != http.StatusOK || !result["direct_upload"] || response.Header().Get("Access-Control-Allow-Origin") != "*" {
+		t.Fatalf("probe response = %d, %s, CORS %q", response.Code, response.Body.String(), response.Header().Get("Access-Control-Allow-Origin"))
+	}
+}
+
 func TestOtherRoutesUseConfiguredCORSOrigin(t *testing.T) {
 	application := NewWithDependencies(config.Config{
 		CORSAllowOrigin: "https://frontend.internal",

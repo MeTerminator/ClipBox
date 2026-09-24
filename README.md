@@ -95,7 +95,7 @@ Configuration is stored in `data/config.json`. The default database settings are
 For private-network or reverse-proxy deployments, configure these additional settings:
 
 - `site_url`: a backend URL that browsers can reach directly, such as `http://10.0.0.20:5328`. Leave it empty to skip direct probing.
-- `upload_direct_first`: defaults to `true`. The frontend probes the upload API at `site_url`; upload initialization, chunks, and completion use it when reachable, otherwise they use the current site's NGINX proxy.
+- `upload_direct_first`: defaults to `true`. On first visit, the frontend calls the dedicated `/api/clip/upload/__direct_probe__` endpoint and stores the result in browser storage. Later visits reuse it without probing. Upload requests and file download links use `site_url` when reachable, otherwise the current site's NGINX proxy.
 - `cors_allow_origin`: allowed origin for regular APIs; defaults to `*`. It can be set to one origin, such as `https://frontend.intranet`. Upload APIs always allow cross-origin requests for probing and cross-host uploads.
 
 `site_url` is used only for browser-to-Go upload probing and must be an HTTP(S) address routable from the browser. If the page uses HTTPS, use HTTPS for direct access too. Keep the `/api/` NGINX proxy configured; uploads fall back to that path when direct access or browser CORS checks fail.
