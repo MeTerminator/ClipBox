@@ -11,7 +11,10 @@
 
   <header class="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
     <div class="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-4">
-      <router-link :to="{ name: 'home' }" class="font-semibold">ClipBox</router-link>
+      <router-link :to="{ name: 'home' }" class="flex items-center gap-2 font-semibold">
+        <img src="/favicon.svg" alt="" aria-hidden="true" class="size-7 shrink-0" />
+        <span>ClipBox</span>
+      </router-link>
       <div class="flex items-center gap-2">
         <Select v-model="locale" @update:model-value="saveLang">
           <SelectTrigger class="w-32"><SelectValue placeholder="Language" /></SelectTrigger>
