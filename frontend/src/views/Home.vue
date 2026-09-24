@@ -17,7 +17,7 @@
               :key="index"
               :ref="(element) => setInputRef(element, index)"
               v-model="digits[index]"
-              class="aspect-square h-auto min-w-0 p-0 text-center font-mono text-3xl font-bold sm:text-4xl"
+              class="aspect-square h-auto min-w-0 p-0 text-center font-mono !text-5xl font-bold sm:!text-6xl"
               inputmode="numeric"
               autocomplete="one-time-code"
               maxlength="1"
@@ -369,7 +369,7 @@ const pickup = async () => {
   if (loading.value) return;
   loading.value = true;
   try {
-    const response = await fetch(backendURL(`/clip/${code}/resolve`), {
+    const response = await fetch(backendURL(`/api/clip/${code}/resolve`), {
       method: "POST",
       headers: { Accept: "application/json" },
     });

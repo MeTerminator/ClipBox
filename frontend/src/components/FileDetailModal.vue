@@ -87,7 +87,7 @@ const qrDataUrl = ref("");
 const copied = ref(false);
 
 const pickupLink = computed(() =>
-  props.item?.code ? `${backendOrigin}/clip/${props.item.code}` : "",
+  props.item?.code ? `${backendOrigin}/api/clip/${props.item.code}` : "",
 );
 const typeLabel = computed(() => t(`clip.${props.item?.type === "text/plain" ? "text" : props.item?.type || "file"}`));
 

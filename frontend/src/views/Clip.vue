@@ -377,7 +377,7 @@ const submitClip = async () => {
       fd.append("expire", String(expire));
       fd.append("content", formData.value.content);
       fd.append("link", activeTab.value === "link" ? "yes" : "no");
-      data = await requestJSON<{ code: string }>("/clip/create", { method: "POST", body: fd });
+      data = await requestJSON<{ code: string }>("/api/clip/create", { method: "POST", body: fd });
     }
 
     if (typeof data.code === "string") {
@@ -484,7 +484,7 @@ const openHistoryItem = async (item: ClipRecord) => {
       remaining_count: number;
       max_count: number;
       expired: boolean;
-    }>(`/clip/${item.code}/info`);
+    }>(`/api/clip/${item.code}/info`);
     const refreshed: ClipRecord = {
       ...item,
       type: info.type === "text/plain" ? "text" : info.type,

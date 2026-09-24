@@ -10,8 +10,8 @@ ClipBox 是一个轻量的临时文件、文本和链接分享服务。用户通
 
 ## 功能
 
-- 文件取件码会重定向到 `/file/<文件sha1>/<原始文件名>`，该路径也可以直接下载。
-- 文本取件码会重定向到 `/text/<文本sha1>`。
+- 文件取件码会重定向到 `/api/file/<文件sha1>/<原始文件名>`，该路径也可以直接下载。
+- 文本取件码会重定向到 `/api/text/<文本sha1>`。
 - 链接保持原有行为，取件码直接跳转到目标 URL。
 - 文件使用多路并发分片上传；未完成分片保存在 `data/tmp/<sha1>`，10 分钟内可恢复进度。
 - 服务端合并分片后重新校验完整文件 SHA1，通过后按 `data/files/<原文件名>_<sha1><后缀>` 保存；重复内容会直接复用已有的本地文件。
@@ -63,7 +63,7 @@ cd ..
 go run .
 ```
 
-前端构建完成后，`go build` 会生成内嵌 `www/` 的独立二进制文件，运行时不再需要单独部署前端目录。首次启动会生成 `data/config.json` 和 SQLite 数据库 `data/clipbox.db`。SQLite 使用纯 Go 驱动，因此 GitHub Actions 打包的 `CGO_ENABLED=0` 二进制也可以直接使用 SQLite。默认监听 `http://127.0.0.1:5328`。前端开发时可在 `frontend/` 中运行 `npm run dev`；Vite 会把 `/clip`、`/file` 和 `/text` 代理到 Go 服务。
+前端构建完成后，`go build` 会生成内嵌 `www/` 的独立二进制文件，运行时不再需要单独部署前端目录。首次启动会生成 `data/config.json` 和 SQLite 数据库 `data/clipbox.db`。SQLite 使用纯 Go 驱动，因此 GitHub Actions 打包的 `CGO_ENABLED=0` 二进制也可以直接使用 SQLite。默认监听 `http://127.0.0.1:5328`。前端开发时可在 `frontend/` 中运行 `npm run dev`；Vite 会把 `/api/` 代理到 Go 服务。所有后端接口（包括上传、取件、文件/文本下载和房间实时连接）统一使用 `/api/` 前缀。
 
 ## 桌面客户端
 
@@ -103,11 +103,13 @@ VITE_API_ORIGIN=https://clipbox.example.com npm run desktop:build
 
 ## 分片上传接口
 
-1. `POST /clip/upload/init`，JSON 为 `{filename,size,sha1,count,expire}`，响应包含服务端分片大小、并发数和已上传的分片序号。
-2. 使用 `PUT /clip/upload/<sha1>/<分片序号>` 并发上传缺失的原始二进制分片。
-3. 使用 `POST /clip/upload/<sha1>/complete` 和 JSON `{filename,count,expire}` 完成上传。
+1. `POST /api/clip/upload/init`，JSON 为 `{filename,size,sha1,count,expire}`，响应包含服务端分片大小、并发数和已上传的分片序号。
+2. 使用 `PUT /api/clip/upload/<sha1>/<分片序号>` 并发上传缺失的原始二进制分片。
+3. 使用 `POST /api/clip/upload/<sha1>/complete` 和 JSON `{filename,count,expire}` 完成上传。
 
 默认分片大小为 4 MiB、并发数为 4、断点保留时间为 10 分钟。可通过 [.env.example](.env.example) 中的环境变量调整。
+
+所有后端请求统一使用 `/api/` 前缀。使用 NGINX 分离部署时，将 `/api/` 代理到 Go 服务，其余请求提供前端静态文件并回退到 `index.html`。上传分片默认 4 MiB，NGINX 的 `client_max_body_size` 需大于单个分片大小；房间 WebSocket 也位于 `/api/rooms/:roomID/ws`。
 
 ## 分享房间接口
 

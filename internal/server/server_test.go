@@ -204,12 +204,12 @@ func TestPickupRedirectsToStableSHA1Routes(t *testing.T) {
 	application := New(cfg, database, uploadManager)
 	application.now = func() time.Time { return now }
 
-	filePickup := performRequest(application.Handler(), http.MethodGet, "/clip/12345", nil)
+	filePickup := performRequest(application.Handler(), http.MethodGet, "/api/clip/12345", nil)
 	if filePickup.Code != http.StatusFound {
 		t.Fatalf("file pickup status = %d, body = %s", filePickup.Code, filePickup.Body.String())
 	}
 	location := filePickup.Header().Get("Location")
-	if !strings.HasPrefix(location, "/file/"+fileHash+"/") {
+	if !strings.HasPrefix(location, "/api/file/"+fileHash+"/") {
 		t.Fatalf("file redirect = %q", location)
 	}
 	fileResponse := performRequest(application.Handler(), http.MethodGet, location, nil)
@@ -220,8 +220,8 @@ func TestPickupRedirectsToStableSHA1Routes(t *testing.T) {
 		t.Fatalf("content disposition = %q", disposition)
 	}
 
-	textPickup := performRequest(application.Handler(), http.MethodGet, "/clip/23456", nil)
-	if textPickup.Code != http.StatusFound || textPickup.Header().Get("Location") != "/text/"+textHash {
+	textPickup := performRequest(application.Handler(), http.MethodGet, "/api/clip/23456", nil)
+	if textPickup.Code != http.StatusFound || textPickup.Header().Get("Location") != "/api/text/"+textHash {
 		t.Fatalf("text redirect status = %d, location = %q", textPickup.Code, textPickup.Header().Get("Location"))
 	}
 	textResponse := performRequest(application.Handler(), http.MethodGet, textPickup.Header().Get("Location"), nil)
@@ -229,7 +229,7 @@ func TestPickupRedirectsToStableSHA1Routes(t *testing.T) {
 		t.Fatalf("text response status = %d, body = %q", textResponse.Code, textResponse.Body.String())
 	}
 
-	linkPickup := performRequest(application.Handler(), http.MethodGet, "/clip/34567", nil)
+	linkPickup := performRequest(application.Handler(), http.MethodGet, "/api/clip/34567", nil)
 	if linkPickup.Code != http.StatusFound || linkPickup.Header().Get("Location") != "https://example.com/original" {
 		t.Fatalf("link redirect status = %d, location = %q", linkPickup.Code, linkPickup.Header().Get("Location"))
 	}
@@ -263,7 +263,7 @@ func TestClipResolveReturnsStructuredContentAndConsumesOnce(t *testing.T) {
 	application.now = func() time.Time { return now }
 
 	for range 2 {
-		info := performRequest(application.Handler(), http.MethodGet, "/clip/12345/info", nil)
+		info := performRequest(application.Handler(), http.MethodGet, "/api/clip/12345/info", nil)
 		if info.Code != http.StatusOK {
 			t.Fatalf("info status = %d, body = %s", info.Code, info.Body.String())
 		}
@@ -289,10 +289,10 @@ func TestClipResolveReturnsStructuredContentAndConsumesOnce(t *testing.T) {
 	}{
 		{"12345", model.ContentText, 2, "hello", "", "", now.Add(time.Hour)},
 		{"23456", model.ContentLink, 1, "https://example.com/path", "", "", now.Add(2 * time.Hour)},
-		{"34567", model.ContentFile, 0, "", "report.pdf", "/file/" + fileHash + "/report.pdf", now.Add(30 * time.Minute)},
+		{"34567", model.ContentFile, 0, "", "report.pdf", "/api/file/" + fileHash + "/report.pdf", now.Add(30 * time.Minute)},
 	}
 	for _, test := range tests {
-		response := performRequest(application.Handler(), http.MethodPost, "/clip/"+test.code+"/resolve", nil)
+		response := performRequest(application.Handler(), http.MethodPost, "/api/clip/"+test.code+"/resolve", nil)
 		if response.Code != http.StatusOK {
 			t.Fatalf("info %s status = %d, body = %s", test.code, response.Code, response.Body.String())
 		}
@@ -313,11 +313,11 @@ func TestClipResolveReturnsStructuredContentAndConsumesOnce(t *testing.T) {
 		}
 	}
 
-	exhaustedInfo := performRequest(application.Handler(), http.MethodGet, "/clip/34567/info", nil)
+	exhaustedInfo := performRequest(application.Handler(), http.MethodGet, "/api/clip/34567/info", nil)
 	if exhaustedInfo.Code != http.StatusOK || !strings.Contains(exhaustedInfo.Body.String(), `"remaining_count":0`) {
 		t.Fatalf("exhausted info status = %d, body = %s", exhaustedInfo.Code, exhaustedInfo.Body.String())
 	}
-	exhausted := performRequest(application.Handler(), http.MethodPost, "/clip/34567/resolve", nil)
+	exhausted := performRequest(application.Handler(), http.MethodPost, "/api/clip/34567/resolve", nil)
 	if exhausted.Code != http.StatusNotFound {
 		t.Fatalf("exhausted code status = %d", exhausted.Code)
 	}
@@ -334,7 +334,7 @@ func TestDirectHashRoutesRejectUnknownContent(t *testing.T) {
 	cfg := config.Config{DataDir: dataDir, WWWRoot: filepath.Join(dataDir, "missing"), MaxUploadFileSize: 1024, UploadWorkers: 4}
 	application := New(cfg, database, uploadManager)
 	missingHash := strings.Repeat("a", 40)
-	for _, path := range []string{"/text/" + missingHash, "/file/" + missingHash + "/missing.txt"} {
+	for _, path := range []string{"/api/text/" + missingHash, "/api/file/" + missingHash + "/missing.txt"} {
 		response := performRequest(application.Handler(), http.MethodGet, path, nil)
 		if response.Code != http.StatusNotFound {
 			t.Fatalf("%s status = %d", path, response.Code)
@@ -357,7 +357,7 @@ func TestDefaultCreationLimitsAndInternalCleanup(t *testing.T) {
 	}, database, uploadManager)
 	application.now = func() time.Time { return now }
 
-	request := httptest.NewRequest(http.MethodPost, "/clip/create", strings.NewReader("content=hello"))
+	request := httptest.NewRequest(http.MethodPost, "/api/clip/create", strings.NewReader("content=hello"))
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	response := httptest.NewRecorder()
 	application.Handler().ServeHTTP(response, request)
@@ -395,7 +395,7 @@ func TestDefaultCreationLimitsAndInternalCleanup(t *testing.T) {
 	if _, err := os.Stat(expiredPath); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("expired file still exists: %v", err)
 	}
-	removedRoute := performRequest(application.Handler(), http.MethodGet, "/clip/timetask_cleanup_files", nil)
+	removedRoute := performRequest(application.Handler(), http.MethodGet, "/api/clip/timetask_cleanup_files", nil)
 	if removedRoute.Code != http.StatusNotFound {
 		t.Fatalf("removed cleanup route status = %d", removedRoute.Code)
 	}
@@ -418,7 +418,7 @@ func TestChunkUploadHTTPFlow(t *testing.T) {
 	hashSum := sha1.Sum(payload)
 	hash := hex.EncodeToString(hashSum[:])
 
-	initResponse := performJSONRequest(t, application.Handler(), http.MethodPost, "/clip/upload/init", map[string]any{
+	initResponse := performJSONRequest(t, application.Handler(), http.MethodPost, "/api/clip/upload/init", map[string]any{
 		"filename": "sample.txt", "size": len(payload), "sha1": hash, "count": 2, "expire": 3600,
 	})
 	if initResponse.Code != http.StatusOK {
@@ -439,7 +439,7 @@ func TestChunkUploadHTTPFlow(t *testing.T) {
 	for index := 0; index < initialized.TotalChunks; index++ {
 		start := index * initialized.ChunkSize
 		end := min(start+initialized.ChunkSize, len(payload))
-		request := httptest.NewRequest(http.MethodPut, "/clip/upload/"+hash+"/"+strconv.Itoa(index), bytes.NewReader(payload[start:end]))
+		request := httptest.NewRequest(http.MethodPut, "/api/clip/upload/"+hash+"/"+strconv.Itoa(index), bytes.NewReader(payload[start:end]))
 		request.Header.Set("Content-Type", "application/octet-stream")
 		response := httptest.NewRecorder()
 		application.Handler().ServeHTTP(response, request)
@@ -448,7 +448,7 @@ func TestChunkUploadHTTPFlow(t *testing.T) {
 		}
 	}
 
-	completeResponse := performJSONRequest(t, application.Handler(), http.MethodPost, "/clip/upload/"+hash+"/complete", map[string]any{
+	completeResponse := performJSONRequest(t, application.Handler(), http.MethodPost, "/api/clip/upload/"+hash+"/complete", map[string]any{
 		"filename": "sample.txt", "count": 2, "expire": 3600,
 	})
 	if completeResponse.Code != http.StatusOK {
@@ -461,10 +461,10 @@ func TestChunkUploadHTTPFlow(t *testing.T) {
 	if err := json.Unmarshal(completeResponse.Body.Bytes(), &completed); err != nil {
 		t.Fatal(err)
 	}
-	if len(completed.Code) != 5 || completed.URL != "/file/"+hash+"/sample.txt" {
+	if len(completed.Code) != 5 || completed.URL != "/api/file/"+hash+"/sample.txt" {
 		t.Fatalf("unexpected complete response: %#v", completed)
 	}
-	pickup := performRequest(application.Handler(), http.MethodGet, "/clip/"+completed.Code, nil)
+	pickup := performRequest(application.Handler(), http.MethodGet, "/api/clip/"+completed.Code, nil)
 	if pickup.Code != http.StatusFound || pickup.Header().Get("Location") != completed.URL {
 		t.Fatalf("pickup status = %d, location = %q", pickup.Code, pickup.Header().Get("Location"))
 	}
@@ -481,7 +481,7 @@ func TestChunkUploadHTTPFlow(t *testing.T) {
 		t.Fatalf("named local path is not a regular file: %q", storedPath)
 	}
 
-	repeatedResponse := performJSONRequest(t, application.Handler(), http.MethodPost, "/clip/upload/init", map[string]any{
+	repeatedResponse := performJSONRequest(t, application.Handler(), http.MethodPost, "/api/clip/upload/init", map[string]any{
 		"filename": "renamed.txt", "size": len(payload), "sha1": hash, "count": 2, "expire": 3600,
 	})
 	if repeatedResponse.Code != http.StatusOK {

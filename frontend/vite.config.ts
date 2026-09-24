@@ -32,7 +32,7 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,svg,woff2}"],
         runtimeCaching: [
           {
-            urlPattern: ({ url, sameOrigin }) => sameOrigin && !url.pathname.startsWith("/api/") && !url.pathname.startsWith("/clip/") && !url.pathname.startsWith("/file/") && !url.pathname.startsWith("/text/"),
+          urlPattern: ({ url, sameOrigin }) => sameOrigin && !url.pathname.startsWith("/api/"),
             handler: "NetworkFirst",
             options: { cacheName: "clipbox-pages", networkTimeoutSeconds: 3 },
           },
@@ -51,18 +51,6 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      "/clip": {
-        target: "http://localhost:5328",
-        changeOrigin: true,
-      },
-      "/file": {
-        target: "http://localhost:5328",
-        changeOrigin: true,
-      },
-      "/text": {
-        target: "http://localhost:5328",
-        changeOrigin: true,
-      },
       "/api": { target: "http://localhost:5328", changeOrigin: true },
     },
   },

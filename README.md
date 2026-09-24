@@ -10,8 +10,8 @@ ClipBox is a small temporary sharing service for files, text, and links. A five-
 
 ## Features
 
-- File pickup codes redirect to `/file/<file-sha1>/<original-filename>`; that path is also directly downloadable.
-- Text pickup codes redirect to `/text/<text-sha1>`.
+- File pickup codes redirect to `/api/file/<file-sha1>/<original-filename>`; that path is also directly downloadable.
+- Text pickup codes redirect to `/api/text/<text-sha1>`.
 - Link pickup codes keep the original behavior and redirect straight to the destination URL.
 - Files are uploaded in parallel chunks. Incomplete chunks are kept under `data/tmp/<sha1>` and can be resumed for 10 minutes.
 - The server verifies the complete file SHA1 before storing it as `data/files/<original-name>_<sha1><extension>`. Repeated content reuses the existing local file.
@@ -63,7 +63,7 @@ cd ..
 go run .
 ```
 
-After the frontend build, `go build` produces a self-contained binary with `www/` embedded; the binary does not need a separate frontend directory at runtime. The first start creates `data/config.json` and the SQLite database at `data/clipbox.db`. SQLite uses a pure-Go driver, so the release binaries also work with `CGO_ENABLED=0`. ClipBox listens on `http://127.0.0.1:5328` by default. For frontend development, run `npm run dev` in `frontend/`; Vite proxies `/clip`, `/file`, and `/text` to the Go server.
+After the frontend build, `go build` produces a self-contained binary with `www/` embedded; the binary does not need a separate frontend directory at runtime. The first start creates `data/config.json` and the SQLite database at `data/clipbox.db`. SQLite uses a pure-Go driver, so the release binaries also work with `CGO_ENABLED=0`. ClipBox listens on `http://127.0.0.1:5328` by default. For frontend development, run `npm run dev` in `frontend/`; Vite proxies `/api/` to the Go server. All backend routes, including uploads, pickup, file/text downloads, and room WebSockets, use the `/api/` prefix.
 
 ## Desktop client
 
@@ -96,11 +96,13 @@ To use MySQL, change `driver` to `mysql`, set `dsn` to a Go MySQL DSN such as `r
 
 ## Upload API
 
-1. `POST /clip/upload/init` with JSON `{filename,size,sha1,count,expire}`. The response includes the server chunk size, worker count, and the indexes already uploaded.
-2. Upload missing raw chunks concurrently with `PUT /clip/upload/<sha1>/<chunk-index>`.
-3. `POST /clip/upload/<sha1>/complete` with JSON `{filename,count,expire}`.
+1. `POST /api/clip/upload/init` with JSON `{filename,size,sha1,count,expire}`. The response includes the server chunk size, worker count, and the indexes already uploaded.
+2. Upload missing raw chunks concurrently with `PUT /api/clip/upload/<sha1>/<chunk-index>`.
+3. `POST /api/clip/upload/<sha1>/complete` with JSON `{filename,count,expire}`.
 
 The default chunk size is 4 MiB, concurrency is 4, and the resume window is 10 minutes. These can be changed using the environment variables documented in [.env.example](.env.example).
+
+All backend requests use the `/api/` prefix. For split deployment with NGINX, proxy `/api/` to the Go service and serve the frontend static files with an `index.html` fallback for other paths. Upload chunks default to 4 MiB, so set `client_max_body_size` larger than one chunk. Room WebSockets are also under `/api/rooms/:roomID/ws`.
 
 ## Share room API
 

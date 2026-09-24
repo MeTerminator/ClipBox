@@ -86,7 +86,7 @@ export function useFileUpload() {
     let lastError: unknown;
     for (let attempt = 1; attempt <= MAX_CHUNK_RETRIES; attempt += 1) {
       try {
-        await requestJSON(`/clip/upload/${uploadID}/${index}`, {
+        await requestJSON(`/api/clip/upload/${uploadID}/${index}`, {
           method: "PUT",
           headers: { "Content-Type": "application/octet-stream" },
           body: blob,
@@ -107,7 +107,7 @@ export function useFileUpload() {
     { count = 1000, expire = 86400 }: UploadOptions = {},
   ): Promise<UploadResult> {
     const sha1 = await calculateSHA1(file);
-    const init = await requestJSON<UploadInitResponse>("/clip/upload/init", {
+    const init = await requestJSON<UploadInitResponse>("/api/clip/upload/init", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -157,7 +157,7 @@ export function useFileUpload() {
       Math.min(init.workers || 4, remaining.length || 1),
     );
     await Promise.all(Array.from({ length: workerCount }, worker));
-    return requestJSON<UploadResult>(`/clip/upload/${init.upload_id}/complete`, {
+    return requestJSON<UploadResult>(`/api/clip/upload/${init.upload_id}/complete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ filename: file.name, count, expire }),

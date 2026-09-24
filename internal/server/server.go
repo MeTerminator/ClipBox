@@ -104,7 +104,8 @@ func NewWithDependencies(cfg config.Config, dependencies Dependencies) *Server {
 func (s *Server) Handler() http.Handler { return s.router }
 
 func (s *Server) registerRoutes(router *gin.Engine) {
-	clips := router.Group("/clip")
+	api := router.Group("/api")
+	clips := api.Group("/clip")
 	clips.POST("/create", s.createClip)
 	clips.GET("/:code/info", s.getClipInfo)
 	clips.POST("/:code/resolve", s.resolveClip)
@@ -116,10 +117,10 @@ func (s *Server) registerRoutes(router *gin.Engine) {
 	uploads.PUT("/:uploadID/:chunk", s.uploadChunk)
 	uploads.POST("/:uploadID/complete", s.completeUpload)
 
-	router.GET("/file/:sha1/*filename", s.getFile)
-	router.GET("/text/:sha1", s.getText)
+	api.GET("/file/:sha1/*filename", s.getFile)
+	api.GET("/text/:sha1", s.getText)
 
-	rooms := router.Group("/api/rooms")
+	rooms := api.Group("/rooms")
 	rooms.POST("", s.createRoom)
 	rooms.POST("/:roomID/join", s.joinRoom)
 	rooms.GET("/:roomID", s.getRoom)
@@ -208,7 +209,7 @@ func (s *Server) getClip(c *gin.Context) {
 		if hash == "" {
 			hash = sha1String(clip.Content)
 		}
-		c.Redirect(http.StatusFound, "/text/"+hash)
+		c.Redirect(http.StatusFound, "/api/text/"+hash)
 	case model.ContentFile:
 		if clip.File == nil || !upload.ValidSHA1(clip.File.SHA1) || clip.File.Filename == "" {
 			jsonError(c, http.StatusNotFound, "Not found")
@@ -659,7 +660,7 @@ func (s *Server) serveEmbeddedFrontend(c *gin.Context) {
 
 func (s *Server) serveAPINotFound(c *gin.Context) bool {
 	path := c.Request.URL.Path
-	if strings.HasPrefix(path, "/api/") || strings.HasPrefix(path, "/clip/") || strings.HasPrefix(path, "/file/") || strings.HasPrefix(path, "/text/") {
+	if strings.HasPrefix(path, "/api/") {
 		jsonError(c, http.StatusNotFound, "Not found")
 		return true
 	}
@@ -735,7 +736,7 @@ func sha1String(value string) string {
 }
 
 func fileURL(hash, filename string) string {
-	return "/file/" + hash + "/" + url.PathEscape(filename)
+	return "/api/file/" + hash + "/" + url.PathEscape(filename)
 }
 
 func allDigits(value string) bool {

@@ -10,29 +10,29 @@
 
 ## Clip
 
-### `POST /clip/create`
+### `POST /api/clip/create`
 
 使用表单字段创建文本或链接：`content`（必填）、`link=yes`（链接时）、`count`、`expire`。成功返回 `200 {"code":"12345"}`。
 
-### `GET /clip/:code/info`
+### `GET /api/clip/:code/info`
 
 读取元数据但不扣减次数。返回类型、到期时间、剩余次数和最大次数；文件额外返回文件名与大小。
 
-### `POST /clip/:code/resolve`
+### `POST /api/clip/:code/resolve`
 
 扣减一次取件次数并返回结构化内容。文本和链接包含 `content`；文件包含 `filename`、`size` 和 `download_url`。
 
-### `GET /clip/:code`
+### `GET /api/clip/:code`
 
-兼容接口。扣减一次次数后，链接跳转到目标地址，文本跳转到 `/text/:sha1`，文件跳转到 `/file/:sha1/:filename`。
+兼容接口。扣减一次次数后，链接跳转到目标地址，文本跳转到 `/api/text/:sha1`，文件跳转到 `/api/file/:sha1/:filename`。
 
-### `GET /text/:sha1` 与 `GET /file/:sha1/:filename`
+### `GET /api/text/:sha1` 与 `GET /api/file/:sha1/:filename`
 
 读取仍被有效 Clip 引用的内容。文件响应包含安全的 `Content-Disposition` 和 `X-Content-Type-Options: nosniff`。
 
 ## 分片上传
 
-### `POST /clip/upload/init`
+### `POST /api/clip/upload/init`
 
 ```json
 {"filename":"report.pdf","size":1234,"sha1":"40位小写十六进制","count":1000,"expire":86400}
@@ -40,15 +40,15 @@
 
 若物理内容已存在，返回 `instant_upload: true`、取件码和 URL。否则返回上传 ID、分片大小、总分片数、已有分片、过期时间和建议并发数。
 
-### `GET /clip/upload/:uploadID`
+### `GET /api/clip/upload/:uploadID`
 
 返回当前上传状态并刷新会话活跃时间。
 
-### `PUT /clip/upload/:uploadID/:chunk`
+### `PUT /api/clip/upload/:uploadID/:chunk`
 
 请求体是该分片的原始字节。除最后一片外长度必须精确等于服务端声明的 `chunk_size`。
 
-### `POST /clip/upload/:uploadID/complete`
+### `POST /api/clip/upload/:uploadID/complete`
 
 ```json
 {"filename":"report.pdf","count":1000,"expire":86400}
