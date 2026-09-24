@@ -526,4 +526,33 @@ func performJSONRequest(t *testing.T, handler http.Handler, method, target strin
 	return recorder
 }
 
+func TestUploadRoutesAlwaysAllowCrossOrigin(t *testing.T) {
+	application := NewWithDependencies(config.Config{
+		CORSAllowOrigin: "https://frontend.internal",
+		WWWRoot:         t.TempDir(),
+	}, Dependencies{})
+	request := httptest.NewRequest(http.MethodOptions, "/api/clip/upload/init", nil)
+	request.Header.Set("Origin", "https://other.internal")
+	request.Header.Set("Access-Control-Request-Method", "POST")
+	response := httptest.NewRecorder()
+	application.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusNoContent || response.Header().Get("Access-Control-Allow-Origin") != "*" {
+		t.Fatalf("upload CORS = %d, %q", response.Code, response.Header().Get("Access-Control-Allow-Origin"))
+	}
+}
+
+func TestOtherRoutesUseConfiguredCORSOrigin(t *testing.T) {
+	application := NewWithDependencies(config.Config{
+		CORSAllowOrigin: "https://frontend.internal",
+		WWWRoot:         t.TempDir(),
+	}, Dependencies{})
+	request := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	request.Header.Set("Origin", "https://frontend.internal")
+	response := httptest.NewRecorder()
+	application.Handler().ServeHTTP(response, request)
+	if response.Header().Get("Access-Control-Allow-Origin") != "https://frontend.internal" {
+		t.Fatalf("configured CORS origin = %q", response.Header().Get("Access-Control-Allow-Origin"))
+	}
+}
+
 var _ store.Store = (*memoryStore)(nil)

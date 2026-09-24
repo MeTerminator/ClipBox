@@ -105,6 +105,7 @@ func (s *Server) Handler() http.Handler { return s.router }
 
 func (s *Server) registerRoutes(router *gin.Engine) {
 	api := router.Group("/api")
+	api.GET("/config", s.getPublicConfig)
 	clips := api.Group("/clip")
 	clips.POST("/create", s.createClip)
 	clips.GET("/:code/info", s.getClipInfo)
@@ -135,15 +136,35 @@ func (s *Server) registerRoutes(router *gin.Engine) {
 
 func (s *Server) cors() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
+		allowOrigin := s.cfg.CORSAllowOrigin
+		if allowOrigin == "" {
+			allowOrigin = "*"
+		}
+		if strings.HasPrefix(c.Request.URL.Path, "/api/clip/upload/") {
+			allowOrigin = "*"
+		}
+		if allowOrigin == "*" {
+			c.Header("Access-Control-Allow-Origin", "*")
+		} else if c.GetHeader("Origin") == allowOrigin {
+			c.Header("Access-Control-Allow-Origin", allowOrigin)
+			c.Header("Vary", "Origin")
+		}
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Requested-With")
+		c.Header("Access-Control-Max-Age", "600")
 		if c.Request.Method == http.MethodOptions {
 			c.AbortWithStatus(http.StatusNoContent)
 			return
 		}
 		c.Next()
 	}
+}
+
+func (s *Server) getPublicConfig(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"site_url":            s.cfg.SiteURL,
+		"upload_direct_first": s.cfg.UploadDirectFirst,
+	})
 }
 
 func (s *Server) createClip(c *gin.Context) {

@@ -92,6 +92,14 @@ Configuration is stored in `data/config.json`. The default database settings are
 }
 ```
 
+For private-network or reverse-proxy deployments, configure these additional settings:
+
+- `site_url`: a backend URL that browsers can reach directly, such as `http://10.0.0.20:5328`. Leave it empty to skip direct probing.
+- `upload_direct_first`: defaults to `true`. The frontend probes the upload API at `site_url`; upload initialization, chunks, and completion use it when reachable, otherwise they use the current site's NGINX proxy.
+- `cors_allow_origin`: allowed origin for regular APIs; defaults to `*`. It can be set to one origin, such as `https://frontend.intranet`. Upload APIs always allow cross-origin requests for probing and cross-host uploads.
+
+`site_url` is used only for browser-to-Go upload probing and must be an HTTP(S) address routable from the browser. If the page uses HTTPS, use HTTPS for direct access too. Keep the `/api/` NGINX proxy configured; uploads fall back to that path when direct access or browser CORS checks fail.
+
 To use MySQL, change `driver` to `mysql`, set `dsn` to a Go MySQL DSN such as `root:password@tcp(127.0.0.1:3306)/clipbox?charset=utf8mb4`, and restart the service. The complete configuration and defaults are written on first start; see [.env.example](.env.example) for optional environment overrides.
 
 ## Upload API

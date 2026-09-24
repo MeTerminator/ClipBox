@@ -1,6 +1,6 @@
 import { ref } from "vue";
 import CryptoJS from "crypto-js";
-import { backendURL } from "@/lib/backend";
+import { backendURL, uploadBackendURL } from "@/lib/backend";
 
 const HASH_CHUNK_SIZE = 4 * 1024 * 1024;
 const MAX_CHUNK_RETRIES = 3;
@@ -36,8 +36,9 @@ class RequestError extends Error {
   }
 }
 
-async function requestJSON<T>(url: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(backendURL(url), options);
+async function requestJSON<T>(url: string, options?: RequestInit, upload = false): Promise<T> {
+  const requestURL = upload ? await uploadBackendURL(url) : backendURL(url);
+  const response = await fetch(requestURL, options);
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   if (!response.ok) {
     throw new RequestError(
@@ -90,7 +91,7 @@ export function useFileUpload() {
           method: "PUT",
           headers: { "Content-Type": "application/octet-stream" },
           body: blob,
-        });
+        }, true);
         return;
       } catch (error) {
         lastError = error;
@@ -117,7 +118,7 @@ export function useFileUpload() {
         count,
         expire,
       }),
-    });
+    }, true);
     if (init.instant_upload) {
       if (!init.code || !init.url) throw new Error("Invalid instant upload response");
       return { code: init.code, instant_upload: true, url: init.url };
@@ -161,7 +162,7 @@ export function useFileUpload() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ filename: file.name, count, expire }),
-    });
+    }, true);
   }
 
   return {

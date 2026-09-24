@@ -20,12 +20,33 @@ func TestLoadFileCreatesSQLiteConfiguration(t *testing.T) {
 	if cfg.UploadSessionTTL != 10*time.Minute {
 		t.Fatalf("upload TTL = %s", cfg.UploadSessionTTL)
 	}
+	if !cfg.UploadDirectFirst || cfg.CORSAllowOrigin != "*" {
+		t.Fatalf("upload/CORS defaults = %v/%q", cfg.UploadDirectFirst, cfg.CORSAllowOrigin)
+	}
 	payload, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(string(payload), `"driver": "sqlite"`) {
 		t.Fatalf("generated configuration does not contain SQLite: %s", payload)
+	}
+}
+
+func TestLoadFileReadsDirectUploadAndCORSSettings(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte(`{
+		"site_url": "https://clipbox.internal",
+		"upload_direct_first": false,
+		"cors_allow_origin": "https://frontend.internal"
+	}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := LoadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.SiteURL != "https://clipbox.internal" || cfg.UploadDirectFirst || cfg.CORSAllowOrigin != "https://frontend.internal" {
+		t.Fatalf("site/upload/CORS config = %q/%v/%q", cfg.SiteURL, cfg.UploadDirectFirst, cfg.CORSAllowOrigin)
 	}
 }
 

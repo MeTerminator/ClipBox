@@ -8,6 +8,10 @@
 
 `count` 是最大取件次数，`expire` 是从创建时间起算的有效秒数；省略或传 `0` 时分别为 `1000` 和 `86400`。
 
+### `GET /api/config`
+
+返回前端上传路由选择所需的公开配置：`site_url` 和 `upload_direct_first`。该接口不包含数据库等服务端敏感配置。
+
 ## Clip
 
 ### `POST /api/clip/create`

@@ -99,6 +99,14 @@ VITE_API_ORIGIN=https://clipbox.example.com npm run desktop:build
 }
 ```
 
+内网/反代部署还可配置：
+
+- `site_url`：浏览器可直连的后端站点地址，例如 `http://10.0.0.20:5328`。留空表示不探测直连地址。
+- `upload_direct_first`：默认为 `true`。前端先探测 `site_url` 的上传 API；可达时上传初始化、分片和完成请求走该地址，不可达时走当前页面的 NGINX 反代地址。
+- `cors_allow_origin`：普通 API 的跨域来源，默认为 `*`；可设为单个来源，例如 `https://frontend.intranet`。上传 API 始终允许跨域，以便前端探测及跨主机上传。
+
+`site_url` 只用于浏览器到 Go 服务的上传直连探测，需使用浏览器可解析且可路由到后端的 HTTP(S) 地址。若页面使用 HTTPS，直连地址也应使用 HTTPS。NGINX 反代模式下仍需将 `/api/` 转发到 Go 服务；直连不可用或浏览器因网络/CORS策略无法访问时，上传会使用该反代路径。
+
 切换 MySQL 时，将 `driver` 改为 `mysql`，并把 `dsn` 设置成 Go MySQL DSN，例如 `root:password@tcp(127.0.0.1:3306)/clipbox?charset=utf8mb4`，然后重启服务。完整配置及默认值会在首次启动时写入文件；环境变量覆盖方式见 [.env.example](.env.example)。
 
 ## 分片上传接口

@@ -25,6 +25,9 @@ type Database struct {
 // Config is the validated runtime configuration consumed by the application.
 type Config struct {
 	Address           string
+	SiteURL           string
+	UploadDirectFirst bool
+	CORSAllowOrigin   string
 	Database          Database
 	DataDir           string
 	WWWRoot           string
@@ -39,6 +42,9 @@ type Config struct {
 
 type fileConfig struct {
 	Address           string   `json:"address"`
+	SiteURL           string   `json:"site_url"`
+	UploadDirectFirst bool     `json:"upload_direct_first"`
+	CORSAllowOrigin   string   `json:"cors_allow_origin"`
 	Database          Database `json:"database"`
 	DataDir           string   `json:"data_dir"`
 	WWWRoot           string   `json:"www_root"`
@@ -86,7 +92,8 @@ func LoadFile(path string) (Config, error) {
 		return Config{}, fmt.Errorf("parse upload_session_ttl: %w", err)
 	}
 	cfg := Config{
-		Address: settings.Address, Database: settings.Database, DataDir: settings.DataDir,
+		Address: settings.Address, SiteURL: settings.SiteURL, UploadDirectFirst: settings.UploadDirectFirst,
+		CORSAllowOrigin: settings.CORSAllowOrigin, Database: settings.Database, DataDir: settings.DataDir,
 		WWWRoot: settings.WWWRoot, RealIPHeader: settings.RealIPHeader,
 		MaxTextSize: settings.MaxTextSize, MaxLinkLength: settings.MaxLinkLength,
 		MaxUploadFileSize: settings.MaxUploadFileSize, UploadChunkSize: settings.UploadChunkSize,
@@ -98,6 +105,8 @@ func LoadFile(path string) (Config, error) {
 func defaultFileConfig() fileConfig {
 	return fileConfig{
 		Address:           ":5328",
+		UploadDirectFirst: true,
+		CORSAllowOrigin:   "*",
 		Database:          Database{Driver: "sqlite", DSN: filepath.Join(defaultDataDir, "clipbox.db")},
 		DataDir:           defaultDataDir,
 		WWWRoot:           "www",
@@ -192,6 +201,26 @@ func applyEnvironment(cfg *Config) error {
 }
 
 func validate(cfg Config) (Config, error) {
+	cfg.SiteURL = strings.TrimRight(strings.TrimSpace(cfg.SiteURL), "/")
+	if cfg.SiteURL != "" {
+		parsed, err := url.ParseRequestURI(cfg.SiteURL)
+		if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" || parsed.User != nil {
+			return Config{}, fmt.Errorf("site_url must be an absolute HTTP(S) URL")
+		}
+	}
+	cfg.CORSAllowOrigin = strings.TrimSpace(cfg.CORSAllowOrigin)
+	if cfg.CORSAllowOrigin == "" {
+		cfg.CORSAllowOrigin = "*"
+	}
+	if strings.Contains(cfg.CORSAllowOrigin, ",") {
+		return Config{}, fmt.Errorf("cors_allow_origin must be * or one origin")
+	}
+	if cfg.CORSAllowOrigin != "*" {
+		origin, err := url.ParseRequestURI(cfg.CORSAllowOrigin)
+		if err != nil || origin.Host == "" || (origin.Scheme != "http" && origin.Scheme != "https") || origin.Path != "" || origin.RawQuery != "" || origin.Fragment != "" || origin.User != nil {
+			return Config{}, fmt.Errorf("cors_allow_origin must be * or an absolute HTTP(S) origin")
+		}
+	}
 	cfg.Database.Driver = strings.ToLower(strings.TrimSpace(cfg.Database.Driver))
 	cfg.Database.DSN = strings.TrimSpace(cfg.Database.DSN)
 	switch cfg.Database.Driver {
