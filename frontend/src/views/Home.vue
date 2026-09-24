@@ -17,7 +17,7 @@
               :key="index"
               :ref="(element) => setInputRef(element, index)"
               v-model="digits[index]"
-              class="aspect-square h-auto min-w-0 p-0 text-center font-mono text-xl font-semibold sm:text-2xl"
+              class="aspect-square h-auto min-w-0 p-0 text-center font-mono text-3xl font-bold sm:text-4xl"
               inputmode="numeric"
               autocomplete="one-time-code"
               maxlength="1"
