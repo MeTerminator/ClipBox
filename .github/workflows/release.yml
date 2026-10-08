@@ -1,4 +1,4 @@
-name: Build and Release
+name: Build and Release Backend
 
 on:
   workflow_dispatch:
@@ -153,33 +153,17 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  desktop:
-    name: Build Tauri portable clients
-    needs: prepare
-    uses: ./.github/workflows/desktop.yml
-    with:
-      version: ${{ needs.prepare.outputs.version }}
-      server_url: ${{ vars.CLIPBOX_SERVER_URL }}
-
   release:
     name: Publish Release
     needs:
       - prepare
       - build
-      - desktop
     runs-on: ubuntu-latest
     steps:
       - name: Download packages
         uses: actions/download-artifact@v4
         with:
           pattern: package-*
-          path: release-assets
-          merge-multiple: true
-
-      - name: Download desktop clients
-        uses: actions/download-artifact@v4
-        with:
-          pattern: desktop-*
           path: release-assets
           merge-multiple: true
 
