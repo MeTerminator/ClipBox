@@ -5,12 +5,18 @@ from pathlib import Path
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 import zipfile
 
 from package_desktop import TARGETS, package_desktop
 
 
 class PortablePackageTests(unittest.TestCase):
+    def test_archives_preserve_executable_permissions_without_chmod(self):
+        # Simulate Windows, where chmod does not set Unix executable bits.
+        with patch.object(Path, "chmod"):
+            self.test_platform_archives_and_checksums()
+
     def test_platform_archives_and_checksums(self):
         for (platform, arch), target in TARGETS.items():
             with self.subTest(platform=platform, arch=arch), tempfile.TemporaryDirectory() as directory:

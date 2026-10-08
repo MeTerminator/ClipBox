@@ -49,8 +49,14 @@ def package_desktop(root: Path, version: str, platform: str, arch: str, target: 
                     output.write(file, file.relative_to(dist).as_posix())
     else:
         archive = dist / f"{name}.tar.gz"
+        def executable_permissions(info: tarfile.TarInfo) -> tarfile.TarInfo:
+            # Windows chmod cannot preserve Unix executable bits on disk.
+            if info.name == f"{name}/{binary_name}":
+                info.mode = 0o755
+            return info
+
         with tarfile.open(archive, "w:gz") as output:
-            output.add(stage, arcname=name)
+            output.add(stage, arcname=name, filter=executable_permissions)
     with archive.open("rb") as file:
         digest = hashlib.file_digest(file, "sha256").hexdigest()
     archive.with_name(f"{archive.name}.sha256").write_text(
