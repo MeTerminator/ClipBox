@@ -153,9 +153,15 @@ import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { toast } from "vue-sonner";
 import { useFileUpload } from "@/composables/useFileUpload";
-import { setRoomFileDropHandler } from "@/composables/fileDropTarget";
+import { setRoomFileCodeHandler, setRoomFileDropHandler } from "@/composables/fileDropTarget";
 import { backendOrigin, backendURL, backendWebSocketURL, uploadBackendURL } from "@/lib/backend";
-import { isDesktopClient, listenForDesktopCopies, setDesktopSharedText } from "@/lib/desktop";
+import {
+  isDesktopClient,
+  listenForDesktopCopies,
+  saveDesktopRoomFile,
+  setDesktopSharedText,
+  setDesktopUploadTarget,
+} from "@/lib/desktop";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -193,6 +199,8 @@ const passwordOpen = ref(false);
 const passwordDraft = ref("");
 const { uploadStage, uploadProgress, uploadFile, resetUploadProgress } = useFileUpload();
 const savedRooms = ref<SavedRoom[]>(loadSavedRooms());
+const downloadedRoomFiles = new Set(loadDownloadedRoomFiles());
+const downloadingRoomFiles = new Set<string>();
 let socket: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 let pingTimer: ReturnType<typeof setInterval> | undefined;
@@ -202,6 +210,48 @@ const me = computed(() => session.value?.room.members.find((member) => member.id
 
 function errorMessage(error: unknown) { return error instanceof Error ? error.message : t("rooms.unknownError"); }
 function loadSavedRooms(): SavedRoom[] { try { return JSON.parse(localStorage.getItem("shareRooms") || "[]") as SavedRoom[]; } catch { return []; } }
+function loadDownloadedRoomFiles(): string[] {
+  try {
+    const stored: unknown = JSON.parse(localStorage.getItem("downloadedRoomFiles") || "[]");
+    return Array.isArray(stored) ? stored.filter((key): key is string => typeof key === "string") : [];
+  } catch { return []; }
+}
+function downloadedFileKey(message: RoomMessage) {
+  const room = session.value?.room;
+  return `${backendOrigin}:${room?.id || ""}:${room?.created_at || ""}:${message.id}`;
+}
+function markDownloadedRoomFile(key: string) {
+  downloadedRoomFiles.add(key);
+  localStorage.setItem("downloadedRoomFiles", JSON.stringify([...downloadedRoomFiles].slice(-500)));
+}
+async function saveRoomDownload(message: RoomMessage, token: string): Promise<string> {
+  if (!message.file) throw new Error(t("rooms.unknownError"));
+  const directURL = await uploadBackendURL(message.file.download_url);
+  const fallbackURL = backendURL(message.file.download_url);
+  try {
+    return await saveDesktopRoomFile(directURL, token, message.file.name);
+  } catch (error) {
+    if (directURL === fallbackURL) throw error;
+    return saveDesktopRoomFile(fallbackURL, token, message.file.name);
+  }
+}
+async function autoDownloadRoomFile(message: RoomMessage) {
+  if (!isDesktopClient() || !message.file || !session.value) return;
+  if (message.sender.id === session.value.room.current_member_id) return;
+  const key = downloadedFileKey(message);
+  if (downloadedRoomFiles.has(key) || downloadingRoomFiles.has(key)) return;
+  downloadingRoomFiles.add(key);
+  const token = session.value.token;
+  try {
+    const path = await saveRoomDownload(message, token);
+    markDownloadedRoomFile(key);
+    toast.success(t("rooms.fileAutoDownloaded", { path }));
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : t("rooms.unknownError"));
+  } finally {
+    downloadingRoomFiles.delete(key);
+  }
+}
 function saveSession(value: RoomSession) {
   const existing = savedRooms.value.find((room) => room.id === value.room.id);
   const member = value.room.members.find((item) => item.id === value.room.current_member_id);
@@ -250,14 +300,14 @@ function connectSocket() {
   connected.value = false; intentionalClose = false;
   const connection = socket = new WebSocket(backendWebSocketURL(`/api/rooms/${session.value.room.id}/ws`));
   connection.addEventListener("open", () => { connection.send(JSON.stringify({ type: "auth", token: session.value?.token })); clearInterval(pingTimer); pingTimer = setInterval(() => sendSocket({ type: "ping" }), 20000); });
-  connection.addEventListener("message", (event) => void handleSocketEvent(event));
+  connection.addEventListener("message", (event) => { if (connection === socket) void handleSocketEvent(event); });
   connection.addEventListener("close", () => { if (connection !== socket) return; connected.value = false; clearInterval(pingTimer); if (!intentionalClose && session.value) { clearTimeout(reconnectTimer); reconnectTimer = setTimeout(connectSocket, 1500); } });
   connection.addEventListener("error", () => connection.close());
 }
 async function handleSocketEvent(event: MessageEvent<string>) {
   let data: Record<string, unknown>; try { data = JSON.parse(event.data) as Record<string, unknown>; } catch { return; }
-  if (data.type === "ready") { connected.value = true; if (session.value) session.value.room = data.room as RoomInfo; messages.value = (data.messages as RoomMessage[]) || []; const latestClipboard = [...messages.value].reverse().find((message) => message.kind === "text" && message.source === "clipboard"); await setDesktopSharedText(latestClipboard?.text || null); await scrollBottom(); }
-  else if (data.type === "message") { const message = data.message as RoomMessage; if (!messages.value.some((item) => item.id === message.id)) messages.value.push(message); if (message.kind === "text" && message.source === "clipboard") await setDesktopSharedText(message.text); await scrollBottom(); }
+  if (data.type === "ready") { connected.value = true; if (session.value) session.value.room = data.room as RoomInfo; messages.value = (data.messages as RoomMessage[]) || []; messages.value.forEach((message) => void autoDownloadRoomFile(message)); const latestClipboard = [...messages.value].reverse().find((message) => message.kind === "text" && message.source === "clipboard"); await setDesktopSharedText(latestClipboard?.text || null); await scrollBottom(); }
+  else if (data.type === "message") { const message = data.message as RoomMessage; if (!messages.value.some((item) => item.id === message.id)) messages.value.push(message); void autoDownloadRoomFile(message); if (message.kind === "text" && message.source === "clipboard") await setDesktopSharedText(message.text); await scrollBottom(); }
   else if (data.type === "presence" && session.value) { session.value.room.members = (data.members as RoomInfo["members"]) || []; saveSession(session.value); }
   else if (data.type === "member_updated" && session.value) {
     const member = data.member as RoomInfo["members"][number];
@@ -279,6 +329,18 @@ async function processRoomFile(file: File) { if (busy.value) return; if (!connec
 async function sendFile(event: Event) { const input = event.target as HTMLInputElement; const file = input.files?.[0]; input.value = ""; if (file) await processRoomFile(file); }
 async function downloadFile(message: RoomMessage) {
   if (!message.file || !session.value) return;
+  if (isDesktopClient()) {
+    const token = session.value.token;
+    const key = downloadedFileKey(message);
+    try {
+      const path = await saveRoomDownload(message, token);
+      markDownloadedRoomFile(key);
+      toast.success(t("rooms.fileSaved", { path }));
+    } catch (error) {
+      toast.error(errorMessage(error));
+    }
+    return;
+  }
   try {
     const headers = { Authorization: `Bearer ${session.value.token}` };
     const directURL = await uploadBackendURL(message.file.download_url);
@@ -334,7 +396,15 @@ function leaveRoom(remove = true) { if (remove && session.value) { savedRooms.va
 function formatSize(bytes: number) { if (!bytes) return "0 B"; const units = ["B", "KB", "MB", "GB"]; const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1); return `${(bytes / 1024 ** index).toFixed(index ? 1 : 0)} ${units[index] || "B"}`; }
 function formatTime(value: string) { return new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", month: "short", day: "numeric" }).format(new Date(value)); }
 async function scrollBottom() { await nextTick(); const viewport = document.querySelector<HTMLElement>("[data-slot='scroll-area-viewport']"); if (viewport) viewport.scrollTop = viewport.scrollHeight; }
-watch(session, (value) => setRoomFileDropHandler(value ? processRoomFile : null), { immediate: true });
+async function sendRoomFileCode(code: string, roomId: string) {
+  if (!connected.value || session.value?.room.id !== roomId) throw new Error(t("rooms.uploadRoomChanged"));
+  sendMessage({ kind: "file", source: "user", file_code: code });
+}
+watch(session, (value) => {
+  setRoomFileDropHandler(value ? processRoomFile : null);
+  setRoomFileCodeHandler(value ? sendRoomFileCode : null);
+  void setDesktopUploadTarget(value ? value.room.id : null);
+}, { immediate: true });
 onMounted(async () => {
   const id = String(route.params.roomID || ""); const saved = savedRooms.value.find((room) => room.id === id); if (saved) void openSavedRoom(saved);
   stopDesktopCopyListener = await listenForDesktopCopies((text) => {
@@ -343,5 +413,5 @@ onMounted(async () => {
   });
   if (isDesktopClient()) toast.info(t("rooms.desktopClipboardReady"));
 });
-onBeforeUnmount(() => { stopDesktopCopyListener?.(); void setDesktopSharedText(null); setRoomFileDropHandler(null); closeSocket(); });
+onBeforeUnmount(() => { stopDesktopCopyListener?.(); void setDesktopSharedText(null); setRoomFileDropHandler(null); setRoomFileCodeHandler(null); void setDesktopUploadTarget(null); closeSocket(); });
 </script>

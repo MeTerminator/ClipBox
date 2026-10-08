@@ -57,34 +57,36 @@ ClipBox 是一个轻量的临时文件、文本和链接分享服务。用户通
 
 ```bash
 cd frontend
-npm ci
-npm run build
+ppnpm install --frozen-lockfile
+pnpm run build
 cd ..
 go run .
 ```
 
-前端构建完成后，`go build` 会生成内嵌 `www/` 的独立二进制文件，运行时不再需要单独部署前端目录。首次启动会生成 `data/config.json` 和 SQLite 数据库 `data/clipbox.db`。SQLite 使用纯 Go 驱动，因此 GitHub Actions 打包的 `CGO_ENABLED=0` 二进制也可以直接使用 SQLite。默认监听 `http://127.0.0.1:5328`。前端开发时可在 `frontend/` 中运行 `npm run dev`；Vite 会把 `/api/` 代理到 Go 服务。所有后端接口（包括上传、取件、文件/文本下载和房间实时连接）统一使用 `/api/` 前缀。
+前端构建完成后，`go build` 会生成内嵌 `www/` 的独立二进制文件，运行时不再需要单独部署前端目录。首次启动会生成 `data/config.json` 和 SQLite 数据库 `data/clipbox.db`。SQLite 使用纯 Go 驱动，因此 GitHub Actions 打包的 `CGO_ENABLED=0` 二进制也可以直接使用 SQLite。默认监听 `http://127.0.0.1:5328`。前端开发时可在 `frontend/` 中运行 `pnpm run dev`；Vite 会把 `/api/` 代理到 Go 服务。所有后端接口（包括上传、取件、文件/文本下载和房间实时连接）统一使用 `/api/` 前缀。
 
 ## 桌面客户端
 
-客户端使用 Tauri 2，复用系统 WebView，支持 Windows、macOS 和 Linux（X11）。关闭主窗口后会继续驻留系统托盘，点击托盘图标可重新打开。
+客户端使用 Tauri 2，复用系统 WebView，支持 Windows、macOS 和 Linux（X11）。客户端以便携版可执行文件分发，不提供安装包。关闭主窗口后会继续驻留系统托盘，点击托盘图标可重新打开。
 
 ```bash
 cd frontend
-npm install
-npm run desktop:dev
+pnpm install
+pnpm run desktop:dev
 
-# 连接远程 ClipBox 服务并生成当前平台安装包
-VITE_API_ORIGIN=https://clipbox.example.com npm run desktop:build
+# 构建当前平台的便携版可执行文件
+VITE_API_ORIGIN=https://clipbox.example.com pnpm run desktop:build
 ```
+
+构建结果为 `frontend/src-tauri/target/release/ClipBox`（Windows 为 `ClipBox.exe`），不会生成安装包。工作目录固定为可执行文件所在目录，与启动时的路径无关。Windows/Linux 的 WebView 数据、localStorage 和缓存保存在该目录的 `data/` 下；macOS 使用非持久化 WebView，并将 localStorage 保存到 `data/local-storage.json`。进程及其子进程的临时目录设为 `data/tmp/`。请解压到可写目录再运行。Windows 需要系统已有 WebView2 Runtime。桌面客户端收到的房间文件会保存到可执行文件旁的 `downloads/` 目录；如果同名文件已存在，新文件会追加本地时间戳（如 `报告-20261008-153000.pdf`）；同一秒内再次重名还会追加序号，不覆盖原文件。下载失败会清理未完成文件。
 
 - Windows/Linux 使用 `Ctrl+C`、`Ctrl+V`，macOS 使用 `Command+C`、`Command+V`。客户端监听按键但不占用系统快捷键。
 - 复制快捷键完成后，客户端只在剪贴板是纯文本且当前分享房间在线时上传；右键菜单、应用菜单、脚本或剪贴板历史工具造成的变化不会上传，图片与文件也不会上传。
 - 收到的最近一条远端剪贴板文本只缓存在客户端内；按下粘贴快捷键时才写入系统剪贴板，避免仅因收到消息就修改本机剪贴板。
 - macOS 首次使用需要在“系统设置 → 隐私与安全性 → 辅助功能”授权。Linux 的全局按键监听依赖 X11；Wayland 出于安全模型限制，当前版本不支持全局快捷键，可在 XWayland/X11 会话使用。
-- 不设置 `VITE_API_ORIGIN` 时桌面客户端默认连接 `http://127.0.0.1:5328`。这项值在打包时写入前端，请使用实际 HTTPS 服务地址发布安装包。
+- 不设置 `VITE_API_ORIGIN` 时桌面客户端默认连接 `http://127.0.0.1:5328`。这项值在打包时写入前端，请使用实际 HTTPS 服务地址发布便携版。
 
-客户端的快捷键监听、托盘与粘贴行为需要在三个真实系统上分别验证；单平台编译成功不能替代跨平台安装和权限验证。
+Windows 端还提供球形桌面悬浮窗。悬浮窗可以在桌面上拖动，把文件拖到悬浮窗会立即上传：当前处于房间时上传并发送到该房间，不在房间时创建普通文件分享。一次拖入多个文件会排队上传，并记住拖入时的目标房间；上传期间切换或离开该房间时会提示未发送，不会误发到新房间。悬浮窗会显示 SHA1 计算和分片上传进度，并可在系统托盘菜单中显示或隐藏。进入房间后，其他成员发送的文件（包括未下载过的历史消息）会自动下载到便携版 `downloads/` 目录，已成功下载的消息在重连和重启后不会重复下载。
 
 ## 配置
 
@@ -132,14 +134,15 @@ VITE_API_ORIGIN=https://clipbox.example.com npm run desktop:build
 
 ## 发布版本
 
-仓库内置了手动触发的 GitHub Actions 工作流 `.github/workflows/release.yml`。在 Actions 页面运行 **Build and Release**，即可构建 Linux、Windows、macOS 的 amd64 和 arm64 版本。每个压缩包都包含一个内嵌前端的独立二进制文件和项目文档。工作流会按上海时区以 `YYMMDD` 格式创建 Release，并附带 `SHA256SUMS` 校验文件。
+仓库内置了手动触发的 GitHub Actions 工作流 `.github/workflows/release.yml`。在 Actions 页面运行 **Build and Release**，即可构建 Linux、Windows、macOS 的 amd64 和 arm64 版本。每个压缩包都包含一个内嵌前端的独立二进制文件和项目文档；工作流还会构建 Windows 桌面客户端便携版压缩包，不生成桌面安装包。工作流会按上海时区以 `YYMMDD` 格式创建 Release，并附带 `SHA256SUMS` 校验文件。
 
 ## 测试
 
 ```bash
 go test ./...
 go vet ./...
-cd frontend && npm run typecheck && npm run build
+cd frontend && pnpm run typecheck && pnpm run build
+cd src-tauri && cargo check
 ```
 
 ## 许可证

@@ -8,7 +8,7 @@ permissions:
 
 env:
   GO_VERSION: '1.23.x'
-  NODE_VERSION: '20.x'
+  NODE_VERSION: '22.x'
 
 jobs:
   prepare:
@@ -25,18 +25,24 @@ jobs:
         shell: bash
         run: echo "version=$(TZ=Asia/Shanghai date +%y%m%d)" >> "$GITHUB_OUTPUT"
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.22.0
+          run_install: false
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
 
       - name: Build frontend
         working-directory: frontend
         run: |
-          npm ci
-          npm run build
+          pnpm install --frozen-lockfile
+          pnpm run build
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -147,17 +153,71 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  desktop-windows:
+    name: Build Windows portable client
+    needs: prepare
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.22.0
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build portable executable
+        working-directory: frontend
+        shell: pwsh
+        env:
+          VITE_API_ORIGIN: ${{ vars.CLIPBOX_SERVER_URL }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm run desktop:build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $package = "clipbox-$env:VERSION-windows-portable"
+          Compress-Archive -Path "src-tauri\target\release\ClipBox.exe" -DestinationPath "$package.zip"
+
+      - name: Upload portable client
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows-portable
+          path: frontend/clipbox-*-windows-portable.zip
+          if-no-files-found: error
+          retention-days: 1
+
   release:
     name: Publish Release
     needs:
       - prepare
       - build
+      - desktop-windows
     runs-on: ubuntu-latest
     steps:
       - name: Download packages
         uses: actions/download-artifact@v4
         with:
           pattern: package-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Download desktop clients
+        uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
           path: release-assets
           merge-multiple: true
 

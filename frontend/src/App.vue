@@ -64,8 +64,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import FileDetailModal from "@/components/FileDetailModal.vue";
-import { roomFileDropHandler } from "@/composables/fileDropTarget";
+import { roomFileCodeHandler, roomFileDropHandler } from "@/composables/fileDropTarget";
 import { useFileUpload } from "@/composables/useFileUpload";
+import { listenForFloatingUploads, type FloatingUploadPayload } from "@/lib/desktop";
 import type { ClipRecord } from "@/types";
 
 const { locale, t } = useI18n();
@@ -79,6 +80,7 @@ const dropResultOpen = ref(false);
 const dropResult = ref<ClipRecord | null>(null);
 const { uploadStage, uploadProgress, uploadFile, resetUploadProgress } = useFileUpload();
 let dragDepth = 0;
+let stopFloatingUploadListener: (() => void) | undefined;
 let colorSchemeQuery: MediaQueryList | null = null;
 
 const applyTheme = () => document.documentElement.classList.toggle("dark", resolvedTheme.value === "dark");
@@ -91,6 +93,9 @@ onMounted(() => {
   systemPrefersDark.value = colorSchemeQuery.matches;
   colorSchemeQuery.addEventListener("change", handleSystemThemeChange);
   applyTheme();
+  void listenForFloatingUploads(handleFloatingUpload).then((stop) => {
+    stopFloatingUploadListener = stop;
+  });
   window.addEventListener("dragenter", handleDragEnter);
   window.addEventListener("dragover", handleDragOver);
   window.addEventListener("dragleave", handleDragLeave);
@@ -99,6 +104,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   colorSchemeQuery?.removeEventListener("change", handleSystemThemeChange);
+  stopFloatingUploadListener?.();
   window.removeEventListener("dragenter", handleDragEnter);
   window.removeEventListener("dragover", handleDragOver);
   window.removeEventListener("dragleave", handleDragLeave);
@@ -157,6 +163,49 @@ const handleDrop = async (event: DragEvent) => {
   } finally {
     resetUploadProgress();
   }
+};
+
+const handleFloatingUpload = async (payload: FloatingUploadPayload) => {
+  if (payload.stage === "error") {
+    toast.error(payload.error || t("common.unexpectedError"));
+    return;
+  }
+  if (payload.stage !== "complete" || !payload.code) return;
+
+  if (payload.to_room) {
+    if (!roomFileCodeHandler.value) {
+      const { emit } = await import("@tauri-apps/api/event");
+      await emit("floating://room-result", { ...payload, stage: "error", error: t("rooms.uploadRoomChanged") });
+      toast.error(t("rooms.uploadRoomChanged"));
+      return;
+    }
+    try {
+      await roomFileCodeHandler.value(payload.code, payload.room_id || "");
+      const { emit } = await import("@tauri-apps/api/event");
+      await emit("floating://room-result", { ...payload, stage: "shared" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t("rooms.unknownError");
+      toast.error(message);
+      const { emit } = await import("@tauri-apps/api/event");
+      await emit("floating://room-result", { ...payload, stage: "error", error: message });
+    }
+    return;
+  }
+
+  const expire = 86400;
+  const count = 1000;
+  const item: ClipRecord = {
+    code: payload.code,
+    type: "file",
+    filename: payload.filename,
+    expiresAt: new Date(Date.now() + expire * 1000).toISOString(),
+    remainingCount: count,
+    maxCount: count,
+  };
+  const history = JSON.parse(localStorage.getItem("clipHistory") || "[]") as ClipRecord[];
+  localStorage.setItem("clipHistory", JSON.stringify([item, ...history.filter((entry) => entry.code !== item.code)].slice(0, 20)));
+  dropResult.value = item;
+  dropResultOpen.value = true;
 };
 
 const setTheme = (value: unknown) => {

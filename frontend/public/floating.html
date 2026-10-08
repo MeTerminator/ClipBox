@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ClipBox Floating Ball</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --ball-size: 88px;
+        --accent: #863bff;
+        --progress: 0;
+        --ring-opacity: 0;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: transparent;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+        user-select: none;
+      }
+
+      body {
+        display: grid;
+        place-items: center;
+      }
+
+      .ball {
+        position: relative;
+        width: var(--ball-size);
+        height: var(--ball-size);
+        border: 2px solid rgba(255, 255, 255, 0.28);
+        border-radius: 50%;
+        background:
+          radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.42), transparent 34%),
+          radial-gradient(circle at 68% 76%, rgba(43, 17, 89, 0.95), #160b2b 68%);
+        box-shadow:
+          0 8px 24px rgba(0, 0, 0, 0.38),
+          0 0 0 1px rgba(0, 0, 0, 0.22);
+        cursor: grab;
+        transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+      }
+
+      .ball::after {
+        content: "";
+        position: absolute;
+        inset: 3px;
+        border-radius: 50%;
+        background: conic-gradient(
+          var(--accent) calc(var(--progress) * 1%),
+          rgba(255, 255, 255, 0.14) 0
+        );
+        mask: radial-gradient(circle, transparent 59%, black 60%);
+        -webkit-mask: radial-gradient(circle, transparent 59%, black 60%);
+        opacity: var(--ring-opacity);
+        transition: opacity 140ms ease;
+      }
+
+      .ball.dragging {
+        transform: scale(1.08);
+        border-color: rgba(134, 59, 255, 0.95);
+        box-shadow:
+          0 10px 34px rgba(134, 59, 255, 0.42),
+          0 0 0 1px rgba(255, 255, 255, 0.24);
+      }
+
+      .ball.error {
+        --accent: #ef4444;
+        border-color: rgba(239, 68, 68, 0.85);
+      }
+
+      .label {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-content: center;
+        gap: 2px;
+        text-align: center;
+        color: #fff;
+        pointer-events: none;
+      }
+
+      .label span:first-child {
+        max-width: 72px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 10px;
+        font-weight: 600;
+        opacity: 0.9;
+      }
+
+      .label span:last-child {
+        font-size: 15px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="ball" class="ball" data-tauri-drag-region aria-label="ClipBox 快速上传">
+      <div class="label">
+        <span id="name">拖入文件</span>
+        <span id="status">ClipBox</span>
+      </div>
+    </div>
+
+    <script src="/floating.js"></script>
+  </body>
+</html>

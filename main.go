@@ -18,7 +18,7 @@ import (
 	"github.com/MeTerminator/ClipBox/internal/upload"
 )
 
-// The production frontend is built into www/ by `npm run build` and embedded
+// The production frontend is built into www/ by `pnpm run build` and embedded
 // here so a single Go binary can serve the complete application.
 //
 //go:embed all:www

@@ -4,7 +4,8 @@ import "./style.css";
 import App from "./App.vue";
 import router from "./router";
 import i18n from "./i18n";
-import { initializeUploadRoute } from "./lib/backend";
+import { backendOrigin, initializeUploadRoute } from "./lib/backend";
+import { setDesktopBackendOrigin } from "./lib/desktop";
 import { registerSW } from "virtual:pwa-register";
 
 if (!("__TAURI_INTERNALS__" in window)) {
@@ -16,5 +17,6 @@ if (!("__TAURI_INTERNALS__" in window)) {
   });
 }
 
-void initializeUploadRoute();
+void setDesktopBackendOrigin(backendOrigin).catch(() => undefined);
+void initializeUploadRoute().then(setDesktopBackendOrigin).catch(() => undefined);
 createApp(App).use(router).use(i18n).mount("#app");

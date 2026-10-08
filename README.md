@@ -57,27 +57,32 @@ Requirements: Go 1.23+ and Node.js 20+. SQLite is the default, so no database se
 
 ```bash
 cd frontend
-npm ci
-npm run build
+ppnpm install --frozen-lockfile
+pnpm run build
 cd ..
 go run .
 ```
 
-After the frontend build, `go build` produces a self-contained binary with `www/` embedded; the binary does not need a separate frontend directory at runtime. The first start creates `data/config.json` and the SQLite database at `data/clipbox.db`. SQLite uses a pure-Go driver, so the release binaries also work with `CGO_ENABLED=0`. ClipBox listens on `http://127.0.0.1:5328` by default. For frontend development, run `npm run dev` in `frontend/`; Vite proxies `/api/` to the Go server. All backend routes, including uploads, pickup, file/text downloads, and room WebSockets, use the `/api/` prefix.
+After the frontend build, `go build` produces a self-contained binary with `www/` embedded; the binary does not need a separate frontend directory at runtime. The first start creates `data/config.json` and the SQLite database at `data/clipbox.db`. SQLite uses a pure-Go driver, so the release binaries also work with `CGO_ENABLED=0`. ClipBox listens on `http://127.0.0.1:5328` by default. For frontend development, run `pnpm run dev` in `frontend/`; Vite proxies `/api/` to the Go server. All backend routes, including uploads, pickup, file/text downloads, and room WebSockets, use the `/api/` prefix.
 
 ## Desktop client
 
-The Tauri 2 client uses the operating system WebView on Windows, macOS, and Linux (X11). Closing its main window keeps it in the system tray; click the tray icon to reopen it.
+The Tauri 2 client uses the operating system WebView on Windows, macOS, and Linux (X11). It is distributed as a portable executable rather than an installer. Closing its main window keeps it in the system tray; click the tray icon to reopen it.
 
 ```bash
 cd frontend
-npm install
-npm run desktop:dev
+pnpm install
+pnpm run desktop:dev
 
-VITE_API_ORIGIN=https://clipbox.example.com npm run desktop:build
+# Build the portable executable for the current platform
+VITE_API_ORIGIN=https://clipbox.example.com pnpm run desktop:build
 ```
 
+The build outputs `frontend/src-tauri/target/release/ClipBox` (or `ClipBox.exe` on Windows) without producing an installer. The working directory is fixed to the executable directory. Windows/Linux WebView data, local storage, and caches live in `data/`; macOS uses an ephemeral WebView and saves local storage to `data/local-storage.json`. Process and child-process temporary files use `data/tmp/`. Extract into a writable directory. Windows requires an existing WebView2 Runtime. Room files received by the desktop client are saved under `downloads/` next to the executable. If a file with the same name already exists, ClipBox appends a local timestamp before the extension, then a sequence number for further collisions in the same second. Existing files are never overwritten; failed downloads are removed.
+
 Windows/Linux use `Ctrl+C` and `Ctrl+V`; macOS uses `Command+C` and `Command+V`. Only a real keyboard shortcut triggers synchronization. Copy uploads only plain text while a sharing room is connected; menu/automation clipboard changes, images, and files are ignored. Received clipboard text stays in the client until the paste shortcut writes it to the system clipboard. macOS requires Accessibility permission. The global listener supports Linux X11, not native Wayland. Without `VITE_API_ORIGIN`, desktop builds connect to `http://127.0.0.1:5328`.
+
+Windows additionally has a round floating ball. It can be dragged around the desktop, and files dropped onto it are uploaded immediately. While a room is active, the uploaded file is sent to that room; otherwise it becomes a normal file share. Multiple dropped files are queued and keep the room destination captured at drop time. Switching or leaving that room during upload reports a delivery failure rather than sending into a different room. The ball displays SHA1 hashing and upload progress and can be shown or hidden from the system tray menu. Other members' room files, including previously undownloaded history, are downloaded automatically to the portable `downloads/` directory while in a room. Successfully downloaded messages are remembered across reconnects and restarts.
 
 ## Configuration
 
@@ -125,14 +130,15 @@ All backend requests use the `/api/` prefix. For split deployment with NGINX, pr
 
 ## Releases
 
-The repository includes a manually triggered GitHub Actions workflow at `.github/workflows/release.yml`. Run **Build and Release** from the Actions tab to build Linux, Windows, and macOS binaries for amd64 and arm64. Each archive contains a single self-contained binary with the built frontend embedded, plus project documentation. The workflow publishes a release named with the Shanghai date in `YYMMDD` format and attaches a `SHA256SUMS` file.
+The repository includes a manually triggered GitHub Actions workflow at `.github/workflows/release.yml`. Run **Build and Release** from the Actions tab to build Linux, Windows, and macOS binaries for amd64 and arm64. Each archive contains a single self-contained binary with the built frontend embedded, plus project documentation. The workflow also builds a Windows portable desktop-client archive; no desktop installer is produced. The workflow publishes a release named with the Shanghai date in `YYMMDD` format and attaches a `SHA256SUMS` file.
 
 ## Test
 
 ```bash
 go test ./...
 go vet ./...
-cd frontend && npm run typecheck && npm run build
+cd frontend && pnpm run typecheck && pnpm run build
+cd src-tauri && cargo check
 ```
 
 ## License
