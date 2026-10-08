@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-set-backend-origin"
+description = "Enables the set_backend_origin command without any pre-configured scope."
+commands.allow = ["set_backend_origin"]
+
+[[permission]]
+identifier = "deny-set-backend-origin"
+description = "Denies the set_backend_origin command without any pre-configured scope."
+commands.deny = ["set_backend_origin"]

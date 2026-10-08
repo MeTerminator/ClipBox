@@ -33,6 +33,7 @@ struct DesktopRuntime {
     shared_text: Arc<Mutex<Option<String>>>,
     backend_origin: Arc<Mutex<String>>,
     room_id: Arc<Mutex<Option<String>>>,
+    download_origins: Arc<Mutex<std::collections::HashSet<String>>>,
     upload_queue: Arc<tokio::sync::Mutex<()>>,
 }
 
@@ -42,6 +43,7 @@ impl Default for DesktopRuntime {
             shared_text: Arc::new(Mutex::new(None)),
             backend_origin: Arc::new(Mutex::new(DEFAULT_BACKEND_ORIGIN.to_string())),
             room_id: Arc::new(Mutex::new(None)),
+            download_origins: Arc::new(Mutex::new(Default::default())),
             upload_queue: Arc::new(tokio::sync::Mutex::new(())),
         }
     }
@@ -102,22 +104,87 @@ fn set_shared_text(runtime: State<'_, DesktopRuntime>, text: Option<String>) {
     }
 }
 
-#[tauri::command]
-fn set_backend_origin(runtime: State<'_, DesktopRuntime>, origin: String) {
-    let origin = origin.trim().trim_end_matches('/').to_string();
-    let origin = if origin.is_empty() {
-        DEFAULT_BACKEND_ORIGIN.to_string()
-    } else {
-        origin
-    };
-    if let Ok(mut current) = runtime.backend_origin.lock() {
-        *current = origin;
+fn http_url(value: &str) -> Result<reqwest::Url, String> {
+    let url = reqwest::Url::parse(value).map_err(|_| "invalid URL")?;
+    if !matches!(url.scheme(), "http" | "https")
+        || url.host_str().is_none()
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.fragment().is_some()
+    {
+        return Err("URL must use HTTP(S), without credentials or fragment".into());
     }
+    Ok(url)
+}
+
+fn network_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        // Never forward room tokens or uploaded file bodies through redirects.
+        .redirect(reqwest::redirect::Policy::none())
+        .connect_timeout(Duration::from_secs(15))
+        .read_timeout(Duration::from_secs(60))
+        .build()
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn set_backend_origin(runtime: State<'_, DesktopRuntime>, origin: String) -> Result<(), String> {
+    let value = origin.trim();
+    let url = http_url(if value.is_empty() {
+        DEFAULT_BACKEND_ORIGIN
+    } else {
+        value
+    })?;
+    if url.path() != "/" || url.query().is_some() {
+        return Err("backend URL must be an origin".into());
+    }
+    let origin = url.origin().ascii_serialization();
+    // The frontend registers the primary backend, then its direct-transfer origin.
+    runtime
+        .download_origins
+        .lock()
+        .map_err(|_| "runtime lock failed")?
+        .insert(origin.clone());
+    *runtime
+        .backend_origin
+        .lock()
+        .map_err(|_| "runtime lock failed")? = origin;
+    Ok(())
+}
+
+fn validate_download_url(
+    value: &str,
+    origins: &std::collections::HashSet<String>,
+) -> Result<reqwest::Url, String> {
+    let url = http_url(value)?;
+    if !origins.contains(&url.origin().ascii_serialization()) {
+        return Err("download origin has not been registered".into());
+    }
+    let parts: Vec<_> = url.path().split('/').collect();
+    if parts.len() != 7
+        || parts[1] != "api"
+        || parts[2] != "rooms"
+        || parts[3].len() != 5
+        || !parts[3].bytes().all(|c| c.is_ascii_digit())
+        || parts[4] != "messages"
+        || parts[5].is_empty()
+        || !parts[5].bytes().all(|c| c.is_ascii_digit())
+        || parts[6] != "file"
+        || url.query().is_some()
+    {
+        return Err("invalid room file URL".into());
+    }
+    Ok(url)
 }
 
 #[tauri::command]
 fn set_upload_target(runtime: State<'_, DesktopRuntime>, room_id: Option<String>) {
     if let Ok(mut current) = runtime.room_id.lock() {
+        if *current != room_id {
+            if let Ok(mut text) = runtime.shared_text.lock() {
+                *text = None;
+            }
+        }
         *current = room_id;
     }
 }
@@ -126,10 +193,22 @@ fn set_upload_target(runtime: State<'_, DesktopRuntime>, room_id: Option<String>
 fn save_portable_storage(
     storage: std::collections::BTreeMap<String, String>,
 ) -> Result<(), String> {
+    static STORAGE_WRITE: Mutex<()> = Mutex::new(());
+    let _write = STORAGE_WRITE.lock().map_err(|_| "storage lock failed")?;
     let directory = create_dir_under_executable("data")?;
     let bytes = serde_json::to_vec(&storage).map_err(|error| error.to_string())?;
     let pending = directory.join("local-storage.json.tmp");
-    std::fs::write(&pending, bytes).map_err(|error| error.to_string())?;
+    let mut options = OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file = options.open(&pending).map_err(|error| error.to_string())?;
+    file.write_all(&bytes).map_err(|error| error.to_string())?;
+    file.sync_all().map_err(|error| error.to_string())?;
+    drop(file);
     std::fs::rename(pending, directory.join("local-storage.json"))
         .map_err(|error| error.to_string())
 }
@@ -227,12 +306,20 @@ fn create_unique_download_file(
 
 #[tauri::command]
 async fn save_room_file(
+    runtime: State<'_, DesktopRuntime>,
     url: String,
     token: Option<String>,
     filename: String,
 ) -> Result<String, String> {
+    let url = {
+        let origins = runtime
+            .download_origins
+            .lock()
+            .map_err(|_| "runtime lock failed")?;
+        validate_download_url(&url, &origins)?
+    };
     let directory = create_dir_under_executable("downloads")?;
-    let client = reqwest::Client::new();
+    let client = network_client()?;
     let mut request = client.get(url);
     if let Some(token) = token {
         request = request.bearer_auth(token);
@@ -345,11 +432,13 @@ fn hash_file(
 ) -> Result<(u64, String), String> {
     emit_upload(app, "hashing", filename, 0, None, room_id.clone(), None);
     let file = File::open(path).map_err(|error| format!("open file failed: {error}"))?;
-    let total = file
+    let metadata = file
         .metadata()
-        .map_err(|error| format!("read file metadata failed: {error}"))?
-        .len()
-        .max(1);
+        .map_err(|error| format!("read file metadata failed: {error}"))?;
+    if !metadata.is_file() {
+        return Err("only regular files can be uploaded".into());
+    }
+    let total = metadata.len().max(1);
     let mut file = file;
     let mut hasher = Sha1::new();
     let mut buffer = vec![0_u8; HASH_CHUNK_SIZE];
@@ -395,6 +484,9 @@ fn read_chunk(path: &Path, start: u64, length: usize) -> Result<Vec<u8>, String>
         }
         read_total += read;
     }
+    if read_total != length {
+        return Err("upload file changed while reading".into());
+    }
     Ok(buffer)
 }
 
@@ -421,7 +513,7 @@ async fn upload_file(
     .map_err(|error| format!("hash worker failed: {error}"))??;
     let count = 1000;
     let expire = if to_room { 31536000 } else { 86400 };
-    let client = reqwest::Client::new();
+    let client = network_client()?;
 
     let init_url = format!("{origin}/api/clip/upload/init");
     let init_response = client
@@ -461,7 +553,15 @@ async fn upload_file(
     let upload_id = init
         .upload_id
         .ok_or("upload init did not return upload_id")?;
-    let chunk_size = init.chunk_size.unwrap_or(HASH_CHUNK_SIZE as u64) as usize;
+    if upload_id.is_empty()
+        || !upload_id
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_')
+    {
+        return Err("invalid upload ID".into());
+    }
+    let chunk_size = usize::try_from(init.chunk_size.unwrap_or(HASH_CHUNK_SIZE as u64))
+        .map_err(|_| "invalid server chunk size")?;
     if chunk_size == 0 || chunk_size > 64 * 1024 * 1024 {
         return Err("invalid server chunk size".to_string());
     }
@@ -511,7 +611,7 @@ async fn upload_file(
                     .ok()
                     .and_then(|index| index.checked_mul(chunk_size as u64))
                     .ok_or("chunk offset overflow")?;
-                let length = (size.saturating_sub(start) as usize).min(chunk_size);
+                let length = size.saturating_sub(start).min(chunk_size as u64) as usize;
                 let chunk_path = path.clone();
                 let bytes = tauri::async_runtime::spawn_blocking(move || {
                     read_chunk(&chunk_path, start, length)
@@ -720,8 +820,40 @@ fn start_keyboard_listener(app: tauri::AppHandle, shared_text: Arc<Mutex<Option<
     });
 }
 
+fn trusted_navigation(url: &reqwest::Url, dev_url: Option<&reqwest::Url>) -> bool {
+    if let Some(dev) = dev_url {
+        return url.origin() == dev.origin();
+    }
+    url.username().is_empty()
+        && url.password().is_none()
+        && url.host_str() == Some("tauri.localhost")
+        && url.port().is_none()
+        && matches!(url.scheme(), "http" | "https")
+        || (url.scheme() == "tauri"
+            && url.host_str() == Some("localhost")
+            && url.username().is_empty()
+            && url.password().is_none()
+            && url.port().is_none())
+}
+
 fn create_main_window(app: &tauri::AppHandle, data_directory: &Path) -> tauri::Result<()> {
+    let dev_url = if cfg!(dev) {
+        app.config().build.dev_url.clone()
+    } else {
+        None
+    };
+    let navigation_dev_url = dev_url.clone();
     let builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+        .on_navigation(move |url| trusted_navigation(url, navigation_dev_url.as_ref()))
+        .on_new_window(|url, _| {
+            // Open web links outside the privileged WebView; reject file/custom schemes.
+            if http_url(url.as_str()).is_ok() {
+                if let Err(error) = open::that_detached(url.as_str()) {
+                    eprintln!("could not open external link: {error}");
+                }
+            }
+            tauri::webview::NewWindowResponse::Deny
+        })
         .title("ClipBox")
         .inner_size(1120.0, 760.0)
         .min_inner_size(720.0, 560.0)
@@ -738,7 +870,15 @@ fn create_main_window(app: &tauri::AppHandle, data_directory: &Path) -> tauri::R
             .and_then(|bytes| serde_json::from_slice(&bytes).ok())
             .unwrap_or_default();
         let script = format!(
-            "window.__CLIPBOX_STORAGE__ = {};\n{}",
+            "(() => {{ if (!({})) return; window.__CLIPBOX_STORAGE__ = {};\n{} }})();",
+            if let Some(dev) = dev_url.as_ref() {
+                format!(
+                    "location.origin === {}",
+                    serde_json::to_string(&dev.origin().ascii_serialization()).unwrap()
+                )
+            } else {
+                "location.protocol === 'tauri:' && location.host === 'localhost' || ['http:', 'https:'].includes(location.protocol) && location.host === 'tauri.localhost'".into()
+            },
             serde_json::to_string(&stored).unwrap(),
             include_str!("portable-storage.js")
         );
@@ -750,7 +890,14 @@ fn create_main_window(app: &tauri::AppHandle, data_directory: &Path) -> tauri::R
 
 #[cfg(windows)]
 fn create_floating_window(app: &tauri::AppHandle, data_directory: &Path) -> tauri::Result<()> {
+    let dev_url = if cfg!(dev) {
+        app.config().build.dev_url.clone()
+    } else {
+        None
+    };
     WebviewWindowBuilder::new(app, "floating", WebviewUrl::App("floating.html".into()))
+        .on_navigation(move |url| trusted_navigation(url, dev_url.as_ref()))
+        .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny)
         .title("ClipBox Floating Ball")
         .inner_size(96.0, 96.0)
         .resizable(false)
@@ -785,6 +932,20 @@ pub fn run() {
             save_portable_storage
         ])
         .setup(|app| {
+            // Portable macOS executables have no .app bundle to supply a Dock icon.
+            #[cfg(target_os = "macos")]
+            {
+                use objc2::{AllocAnyThread, MainThreadMarker};
+                use objc2_app_kit::{NSApplication, NSImage};
+                use objc2_foundation::NSData;
+                let mtm = MainThreadMarker::new().ok_or("setup must run on the main thread")?;
+                let data = NSData::with_bytes(include_bytes!("../icons/icon.png"));
+                if let Some(icon) = NSImage::initWithData(NSImage::alloc(), &data) {
+                    unsafe {
+                        NSApplication::sharedApplication(mtm).setApplicationIconImage(Some(&icon))
+                    };
+                }
+            }
             let data_directory =
                 create_dir_under_executable("data").map_err(std::io::Error::other)?;
             create_main_window(app.handle(), &data_directory)?;
@@ -900,6 +1061,90 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn network_client_does_not_follow_redirects() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            let mut request = [0; 4096];
+            stream.read(&mut request).unwrap();
+            stream.write_all(b"HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1:1/private\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").unwrap();
+        });
+        tauri::async_runtime::block_on(async {
+            let response = network_client()
+                .unwrap()
+                .get(format!("http://{address}/"))
+                .bearer_auth("test-token")
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(response.status(), reqwest::StatusCode::FOUND);
+        });
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn downloads_reject_unregistered_origins_and_non_room_paths() {
+        let origins = [
+            "https://box.example:444".to_string(),
+            "http://127.0.0.1:5328".to_string(),
+        ]
+        .into_iter()
+        .collect();
+        for url in [
+            "https://box.example:444/api/rooms/12345/messages/42/file",
+            "http://127.0.0.1:5328/api/rooms/12345/messages/42/file",
+        ] {
+            assert!(validate_download_url(url, &origins).is_ok());
+        }
+        for url in [
+            "https://evil.example/api/rooms/12345/messages/42/file",
+            "https://box.example:444/admin",
+            "https://user:pass@box.example:444/api/rooms/12345/messages/42/file",
+            "file:///etc/passwd",
+            "https://box.example:444/api/rooms/12345/messages/42/file?redirect=evil",
+        ] {
+            assert!(validate_download_url(url, &origins).is_err(), "{url}");
+        }
+    }
+
+    #[test]
+    fn navigation_rejects_remote_pages_and_confusable_hosts() {
+        for value in [
+            "tauri://localhost/index.html",
+            "http://tauri.localhost/",
+            "https://tauri.localhost/rooms",
+        ] {
+            assert!(trusted_navigation(&value.parse().unwrap(), None));
+        }
+        for value in [
+            "https://evil.example",
+            "http://tauri.localhost.evil.example",
+            "tauri://evil/",
+            "http://user@tauri.localhost",
+            "http://tauri.localhost:8080",
+            "file:///etc/passwd",
+        ] {
+            assert!(
+                !trusted_navigation(&value.parse().unwrap(), None),
+                "{value}"
+            );
+        }
+        let dev = "http://localhost:5173".parse().unwrap();
+        assert!(trusted_navigation(
+            &"http://localhost:5173/rooms".parse().unwrap(),
+            Some(&dev)
+        ));
+        assert!(!trusted_navigation(
+            &"http://localhost:5174/".parse().unwrap(),
+            Some(&dev)
+        ));
+    }
 
     #[test]
     fn filenames_are_safe_on_windows() {

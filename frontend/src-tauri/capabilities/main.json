@@ -1,0 +1,15 @@
+{
+  "identifier": "main-commands",
+  "description": "Native clipboard, backend and storage commands are only available to the main window.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "allow-set-shared-text",
+    "allow-set-backend-origin",
+    "allow-set-upload-target",
+    "allow-save-room-file",
+    "allow-save-portable-storage",
+    "core:event:allow-emit"
+  ]
+}
