@@ -134,7 +134,15 @@ Windows 端还提供球形桌面悬浮窗。悬浮窗可以在桌面上拖动，
 
 ## 发布版本
 
-仓库内置了手动触发的 GitHub Actions 工作流 `.github/workflows/release.yml`。在 Actions 页面运行 **Build and Release**，即可构建 Linux、Windows、macOS 的 amd64 和 arm64 版本。每个压缩包都包含一个内嵌前端的独立二进制文件和项目文档；工作流还会构建 Windows 桌面客户端便携版压缩包，不生成桌面安装包。工作流会按上海时区以 `YYMMDD` 格式创建 Release，并附带 `SHA256SUMS` 校验文件。
+仓库内置了手动触发的 GitHub Actions 工作流 `.github/workflows/release.yml`。在 Actions 页面运行 **Build and Release**，即可构建 Linux、Windows、macOS 的 amd64 和 arm64 版本。每个压缩包都包含一个内嵌前端的独立二进制文件和项目文档；工作流还会调用 Tauri 客户端打包流程，为 Windows amd64、macOS amd64/arm64 和 Linux amd64/arm64 生成便携版压缩包，不生成桌面安装包。工作流会按上海时区以 `YYMMDD` 格式创建 Release，并附带 `SHA256SUMS` 校验文件。
+
+Tauri 客户端也可以单独打包：
+
+1. 在仓库 **Settings → Secrets and variables → Actions → Variables** 设置 `CLIPBOX_SERVER_URL` 为客户端需要连接的服务地址。
+2. 在 **Actions → Build Tauri Portable Clients → Run workflow** 运行 `.github/workflows/desktop.yml`。可选输入 `version` 指定压缩包版本（默认上海日期 `YYMMDD`），`server_url` 可覆盖仓库变量；地址均未设置时使用 `http://127.0.0.1:5328`。
+3. 完成后从运行页面的 Artifacts 下载 `desktop-<平台>-<架构>-portable`，产物保留 14 天。Windows 为 ZIP，macOS/Linux 为 TAR.GZ，名称格式为 `clipbox-client-<版本>-<平台>-<架构>-portable`，随附 SHA-256 校验文件和使用说明。
+
+单独运行客户端流程只生成构建产物；运行 **Build and Release** 会把这些客户端压缩包与服务端压缩包一起发布到 GitHub Release。两个流程均使用 pnpm 冻结锁文件和 Cargo `--locked`。Linux 客户端以 Ubuntu 22.04 为构建基线，依赖系统 WebKitGTK/GTK；macOS 客户端未签名/公证。各平台运行要求见 [便携客户端说明](docs/PORTABLE.md)。
 
 ## 测试
 

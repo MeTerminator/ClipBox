@@ -130,7 +130,15 @@ All backend requests use the `/api/` prefix. For split deployment with NGINX, pr
 
 ## Releases
 
-The repository includes a manually triggered GitHub Actions workflow at `.github/workflows/release.yml`. Run **Build and Release** from the Actions tab to build Linux, Windows, and macOS binaries for amd64 and arm64. Each archive contains a single self-contained binary with the built frontend embedded, plus project documentation. The workflow also builds a Windows portable desktop-client archive; no desktop installer is produced. The workflow publishes a release named with the Shanghai date in `YYMMDD` format and attaches a `SHA256SUMS` file.
+The repository includes a manually triggered GitHub Actions workflow at `.github/workflows/release.yml`. Run **Build and Release** from the Actions tab to build Linux, Windows, and macOS binaries for amd64 and arm64. Each archive contains a single self-contained binary with the built frontend embedded, plus project documentation. The workflow also calls the Tauri pipeline to build portable clients for Windows amd64, macOS amd64/arm64, and Linux amd64/arm64; no desktop installers are produced. The workflow publishes a release named with the Shanghai date in `YYMMDD` format and attaches a `SHA256SUMS` file.
+
+To build just the Tauri clients:
+
+1. Set the repository Actions variable `CLIPBOX_SERVER_URL` to your backend URL under **Settings → Secrets and variables → Actions → Variables**.
+2. Run **Actions → Build Tauri Portable Clients → Run workflow** (`.github/workflows/desktop.yml`). Optional inputs: `version` for the archive version (defaults to the Shanghai date in `YYMMDD` format), and `server_url` to override the repository variable. Without either backend URL setting, clients connect to `http://127.0.0.1:5328`.
+3. Download `desktop-<platform>-<arch>-portable` from the run's Artifacts section within 14 days. Archives are ZIP on Windows and TAR.GZ on macOS/Linux, named `clipbox-client-<version>-<platform>-<arch>-portable`, with SHA-256 checksums and usage instructions.
+
+The standalone client workflow uploads build artifacts. **Build and Release** publishes the client archives alongside the server packages on GitHub Releases. Both use pnpm's frozen lockfile and Cargo `--locked`. Linux clients target an Ubuntu 22.04 baseline and use system WebKitGTK/GTK libraries; macOS executables are unsigned and not notarized. See [portable client instructions](docs/PORTABLE.md) for platform requirements.
 
 ## Test
 

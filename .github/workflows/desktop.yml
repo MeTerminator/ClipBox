@@ -1,0 +1,163 @@
+name: Build Tauri Portable Clients
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Archive version (empty = Shanghai date YYMMDD)'
+        required: false
+        type: string
+        default: ''
+      server_url:
+        description: 'Backend URL (empty = CLIPBOX_SERVER_URL variable or localhost:5328)'
+        required: false
+        type: string
+        default: ''
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      server_url:
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    name: Tauri ${{ matrix.platform }} ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            platform: windows
+            arch: amd64
+            target: x86_64-pc-windows-msvc
+          - runner: macos-15-intel
+            platform: macos
+            arch: amd64
+            target: x86_64-apple-darwin
+          - runner: macos-15
+            platform: macos
+            arch: arm64
+            target: aarch64-apple-darwin
+          - runner: ubuntu-22.04
+            platform: linux
+            arch: amd64
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-22.04-arm
+            platform: linux
+            arch: arm64
+            target: aarch64-unknown-linux-gnu
+    defaults:
+      run:
+        shell: bash
+    env:
+      VITE_API_ORIGIN: ${{ inputs.server_url || vars.CLIPBOX_SERVER_URL || 'http://127.0.0.1:5328' }}
+      BUILD_TARGET: ${{ matrix.target }}
+      CARGO_TERM_COLOR: always
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Resolve archive version and backend URL
+        id: settings
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          version="${REQUESTED_VERSION:-$(TZ=Asia/Shanghai date +%y%m%d)}"
+          if [[ ! "$version" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]]; then
+            echo 'Version must contain only letters, numbers, dots, underscores or hyphens.' >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          node -e 'const u = new URL(process.env.VITE_API_ORIGIN); if (!["http:", "https:"].includes(u.protocol) || u.username || u.password || u.pathname !== "/" || u.search || u.hash) throw new Error("Backend URL must be an HTTP(S) origin without credentials, path, query or fragment");'
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config libwebkit2gtk-4.1-dev libssl-dev \
+            libayatana-appindicator3-dev librsvg2-dev libxdo-dev \
+            libx11-dev libxi-dev libxtst-dev
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.22.0
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Test archive packaging
+        run: python -m unittest discover -s .github/scripts -p 'test_*.py' -v
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+          components: rustfmt
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: frontend/src-tauri -> target
+          key: ${{ matrix.target }}
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Check frontend types
+        working-directory: frontend
+        run: pnpm run typecheck
+
+      - name: Check Rust formatting and run tests
+        working-directory: frontend/src-tauri
+        run: |
+          cargo fmt --check
+          cargo test --locked --target "$BUILD_TARGET" --lib
+
+      - name: Build portable executable
+        working-directory: frontend
+        run: pnpm run desktop:build --ci --target "$BUILD_TARGET" -- --locked
+
+      - name: Package portable executable
+        env:
+          ARCHIVE_VERSION: ${{ steps.settings.outputs.version }}
+          PLATFORM: ${{ matrix.platform }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          python .github/scripts/package_desktop.py \
+            --version "$ARCHIVE_VERSION" --platform "$PLATFORM" \
+            --arch "$ARCH" --target "$BUILD_TARGET"
+
+      - name: Upload portable client and checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform }}-${{ matrix.arch }}-portable
+          path: |
+            dist/clipbox-client-*.zip
+            dist/clipbox-client-*.tar.gz
+            dist/clipbox-client-*.sha256
+          if-no-files-found: error
+          retention-days: 14
