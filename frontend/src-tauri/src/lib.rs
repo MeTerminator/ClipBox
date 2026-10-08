@@ -11,7 +11,11 @@ use std::{
 };
 
 use arboard::Clipboard;
+#[cfg(not(target_os = "macos"))]
 use rdev::{listen, Event, EventType, Key};
+
+#[cfg(target_os = "macos")]
+mod macos_keyboard;
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
 use tauri::{
@@ -77,6 +81,7 @@ struct FloatingUploadPayload {
     error: Option<String>,
 }
 
+#[cfg(not(target_os = "macos"))]
 #[derive(Default)]
 struct KeyState {
     ctrl: bool,
@@ -89,6 +94,11 @@ struct KeyState {
 fn set_shared_text(runtime: State<'_, DesktopRuntime>, text: Option<String>) {
     if let Ok(mut current) = runtime.shared_text.lock() {
         *current = text.filter(|value| !value.is_empty());
+        #[cfg(target_os = "macos")]
+        eprintln!(
+            "[clipboard] room text cache: {}",
+            if current.is_some() { "ready" } else { "empty" }
+        );
     }
 }
 
@@ -604,6 +614,41 @@ fn start_floating_upload(app: tauri::AppHandle, runtime: DesktopRuntime, path: P
     });
 }
 
+#[cfg(target_os = "macos")]
+fn start_keyboard_listener(app: tauri::AppHandle, shared_text: Arc<Mutex<Option<String>>>) {
+    macos_keyboard::start(app, shared_text);
+}
+
+#[cfg(target_os = "macos")]
+fn read_copied_text(app: tauri::AppHandle) {
+    thread::spawn(move || {
+        // Wait for the foreground application to handle the forwarded copy key.
+        thread::sleep(Duration::from_millis(90));
+        let result = objc2::rc::autoreleasepool(|_| -> Result<(), String> {
+            let mut clipboard = Clipboard::new().map_err(|error| error.to_string())?;
+            if clipboard
+                .get()
+                .file_list()
+                .is_ok_and(|files| !files.is_empty())
+                || clipboard.get_image().is_ok()
+            {
+                return Ok(());
+            }
+            let text = clipboard.get_text().map_err(|error| error.to_string())?;
+            if !text.is_empty() {
+                app.emit("clipboard://copy", ClipboardCopyPayload { text })
+                    .map_err(|error| error.to_string())?;
+                eprintln!("[clipboard] copy: text emitted to room frontend");
+            }
+            Ok(())
+        });
+        if let Err(error) = result {
+            eprintln!("[clipboard] copy failed: {error}");
+        }
+    });
+}
+
+#[cfg(not(target_os = "macos"))]
 fn start_keyboard_listener(app: tauri::AppHandle, shared_text: Arc<Mutex<Option<String>>>) {
     thread::spawn(move || {
         let keys = Arc::new(Mutex::new(KeyState::default()));

@@ -418,6 +418,10 @@ version = "0.1.0"
 dependencies = [
  "arboard",
  "chrono",
+ "core-foundation 0.7.0",
+ "core-graphics 0.19.2",
+ "foreign-types 0.3.2",
+ "objc2",
  "rdev",
  "reqwest",
  "serde",

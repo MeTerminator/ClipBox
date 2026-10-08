@@ -86,6 +86,42 @@ VITE_API_ORIGIN=https://clipbox.example.com pnpm run desktop:build
 - macOS 首次使用需要在“系统设置 → 隐私与安全性 → 辅助功能”授权。Linux 的全局按键监听依赖 X11；Wayland 出于安全模型限制，当前版本不支持全局快捷键，可在 XWayland/X11 会话使用。
 - 不设置 `VITE_API_ORIGIN` 时桌面客户端默认连接 `http://127.0.0.1:5328`。这项值在打包时写入前端，请使用实际 HTTPS 服务地址发布便携版。
 
+独立 Python 房间测试端见 [scripts/README.md](scripts/README.md)，可加入同一房间、读取/修改共享剪贴板，并实时输出聊天和文件下载 URL。
+
+### macOS 本地测试
+
+需要 Rust/Cargo 和 Xcode Command Line Tools（未安装时运行 `xcode-select --install`）。
+
+终端一，从项目根目录启动后端：
+
+```bash
+cd frontend
+pnpm install --frozen-lockfile
+pnpm run build
+cd ..
+go run .
+```
+
+终端二，从项目根目录启动桌面客户端：
+
+```bash
+cd frontend
+pnpm run desktop:dev
+```
+
+在“系统设置 → 隐私与安全性 → 辅助功能”中授权运行客户端的终端或 ClipBox；如果系统要求输入监控权限，也需授权。授权后完全退出客户端并重新启动，关闭窗口只会隐藏到托盘。
+
+1. 桌面客户端连接本地服务并进入房间，浏览器打开 `http://127.0.0.1:5328` 并加入同一房间。
+2. 在文本编辑器连续输入、切换中英文输入法、按住/松开 Command，确认客户端持续运行。
+3. 在文本编辑器选择纯文本，按 `Command+C`，确认浏览器房间收到文本；长按 C 不应重复发送。
+4. 在浏览器房间发送另一段文本，回到文本编辑器按 `Command+V`，确认粘贴的是收到的文本。
+5. 用右键菜单复制文本、复制图片或文件，确认没有自动上传；正常系统快捷键仍可使用。
+6. 完全退出开发客户端后，运行 `pnpm run desktop:build`，再运行 `./src-tauri/target/release/ClipBox`，重复上述测试。若发布到远程服务，构建时设置 `VITE_API_ORIGIN`。
+
+开发服务器固定使用 5173 端口。若提示端口被占用，先在此前运行开发服务器的终端按 `Ctrl+C`；可用 `lsof -nP -iTCP:5173 -sTCP:LISTEN` 查找占用进程，再关闭对应开发任务后重试。退出码 143 表示进程收到 SIGTERM，需结合停止操作判断，不等同于键盘监听崩溃。远程服务开发命令为 `VITE_API_ORIGIN=https://box.mett.top:444 pnpm run desktop:dev`，地址无需 Markdown 链接标记。
+
+macOS 键盘监听使用原生 Session 事件 tap，按当前事件的 Command 标志识别快捷键，不在后台线程查询输入法字符。客户端启动时提示辅助功能权限，未授权时自动重试；按粘贴键时先写入房间文本再继续传递按键。诊断日志以 `[clipboard]` 开头：`listener ready` 表示监听启动，`room text cache: ready` 表示缓存了房间文本，`Command+C received` 表示收到复制快捷键，`room text written before key delivery` 表示粘贴前已写入系统剪贴板。
+
 Windows 端还提供球形桌面悬浮窗。悬浮窗可以在桌面上拖动，把文件拖到悬浮窗会立即上传：当前处于房间时上传并发送到该房间，不在房间时创建普通文件分享。一次拖入多个文件会排队上传，并记住拖入时的目标房间；上传期间切换或离开该房间时会提示未发送，不会误发到新房间。悬浮窗会显示 SHA1 计算和分片上传进度，并可在系统托盘菜单中显示或隐藏。进入房间后，其他成员发送的文件（包括未下载过的历史消息）会自动下载到便携版 `downloads/` 目录，已成功下载的消息在重连和重启后不会重复下载。
 
 ## 配置

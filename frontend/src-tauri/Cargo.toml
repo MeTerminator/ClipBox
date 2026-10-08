@@ -22,7 +22,6 @@ serde_json = "1"
 sha1 = "0.10"
 tokio = { version = "1", features = ["sync"] }
 arboard = "3.6"
-rdev = "0.5"
 serde = { version = "1", features = ["derive"] }
 tauri = { version = "2", features = ["tray-icon", "image-png"] }
 
@@ -31,3 +30,12 @@ reqwest = { version = "0.13", default-features = false, features = ["json", "nat
 
 [target.'cfg(not(windows))'.dependencies]
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-graphics = "0.19"
+core-foundation = "0.7"
+foreign-types = "0.3"
+objc2 = "0.6"
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+rdev = "0.5"
