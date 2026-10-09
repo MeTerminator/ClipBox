@@ -1,47 +1,64 @@
 const ball = document.getElementById("ball");
-const name = document.getElementById("name");
-const status = document.getElementById("status");
+const progress = document.getElementById("progress");
+const views = ["logo", "upload", "progress", "complete", "error"];
+const idleTitle = "拖入文件上传，双击打开 ClipBox，右键隐藏";
 let resetTimer;
 let currentCode = null;
+let stage = "idle";
+let dragging = false;
+
+function updateView() {
+  const view = ["hashing", "uploading"].includes(stage) ? "progress"
+    : stage === "error" ? "error"
+    : ["complete", "shared"].includes(stage) ? "complete"
+    : dragging ? "upload" : "logo";
+  views.forEach((id) => { document.getElementById(id).hidden = id !== view; });
+  ball.classList.toggle("dragging", dragging && stage === "idle");
+  ball.classList.toggle("error", stage === "error");
+}
 
 function render(payload) {
   if (!payload) return;
   clearTimeout(resetTimer);
   currentCode = payload.code || null;
-  name.textContent = payload.filename || "文件";
-  ball.title = payload.error || payload.filename || "拖入文件快速上传";
-  status.textContent =
-    payload.stage === "hashing"
-      ? `${payload.progress}%`
-      : payload.stage === "uploading"
-        ? `${payload.progress}%`
-        : payload.stage === "complete"
-          ? (payload.to_room ? "已上传" : (payload.code || "完成"))
-          : payload.stage === "shared"
-            ? "已发送"
-          : payload.stage === "error"
-            ? "失败"
-            : "ClipBox";
-  ball.style.setProperty("--progress", String(payload.progress || 0));
-  ball.style.setProperty("--ring-opacity", ["complete", "shared"].includes(payload.stage) ? "0" : "1");
-  ball.classList.toggle("error", payload.stage === "error");
-  if (["complete", "shared", "error"].includes(payload.stage)) {
+  stage = payload.stage;
+  ball.title = payload.error || payload.filename || idleTitle;
+  progress.textContent = `${Math.max(0, Math.min(100, Math.round(payload.progress || 0)))}%`;
+  updateView();
+  if (["complete", "shared", "error"].includes(stage)) {
     resetTimer = setTimeout(() => {
-      name.textContent = "拖入文件";
-      status.textContent = "ClipBox";
-      ball.style.setProperty("--progress", "0");
-      ball.style.setProperty("--ring-opacity", "0");
-      ball.classList.remove("error");
+      stage = "idle";
+      ball.title = idleTitle;
+      updateView();
     }, 2200);
   }
 }
 
-if (window.__TAURI__?.event) {
-  window.__TAURI__.event.listen("floating://upload", ({ payload }) => render(payload));
-  window.__TAURI__.event.listen("floating://room-result", ({ payload }) => {
+const tauri = window.__TAURI__;
+if (tauri?.event) {
+  tauri.event.listen("floating://upload", ({ payload }) => render(payload));
+  tauri.event.listen("floating://room-result", ({ payload }) => {
     if (payload.code === currentCode) render(payload);
   });
-  window.__TAURI__.event.listen("floating://drag", ({ payload }) => {
-    ball.classList.toggle("dragging", Boolean(payload?.dragging));
+  tauri.event.listen("floating://drag", ({ payload }) => {
+    dragging = Boolean(payload?.dragging);
+    updateView();
   });
+  ball.addEventListener("dblclick", () => tauri.core.invoke("show_main_window").catch(console.error));
+  ball.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+    tauri.core.invoke("show_floating_menu").catch(console.error);
+  });
+  // Start moving only after a pointer gesture, preserving normal double clicks.
+  let pointerStart;
+  ball.addEventListener("pointerdown", (event) => {
+    if (event.button === 0) pointerStart = { x: event.screenX, y: event.screenY };
+  });
+  ball.addEventListener("pointermove", (event) => {
+    if (!pointerStart || !(event.buttons & 1)) return;
+    if (Math.hypot(event.screenX - pointerStart.x, event.screenY - pointerStart.y) < 4) return;
+    pointerStart = undefined;
+    tauri.window.getCurrentWindow().startDragging().catch(console.error);
+  });
+  window.addEventListener("pointerup", () => { pointerStart = undefined; });
 }

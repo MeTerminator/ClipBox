@@ -28,9 +28,26 @@ const DEFAULT_BACKEND_ORIGIN: &str = "http://127.0.0.1:5328";
 const HASH_CHUNK_SIZE: usize = 4 * 1024 * 1024;
 const UPLOAD_WORKERS: usize = 4;
 
+#[derive(Default)]
+struct ClipboardState {
+    enabled: bool,
+    text: Option<String>,
+}
+
+impl ClipboardState {
+    fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+        self.text = None;
+    }
+
+    fn cache_text(&mut self, text: Option<String>) {
+        self.text = text.filter(|value| self.enabled && !value.is_empty());
+    }
+}
+
 #[derive(Clone)]
 struct DesktopRuntime {
-    shared_text: Arc<Mutex<Option<String>>>,
+    shared_text: Arc<Mutex<ClipboardState>>,
     backend_origin: Arc<Mutex<String>>,
     room_id: Arc<Mutex<Option<String>>>,
     download_origins: Arc<Mutex<std::collections::HashSet<String>>>,
@@ -40,7 +57,7 @@ struct DesktopRuntime {
 impl Default for DesktopRuntime {
     fn default() -> Self {
         Self {
-            shared_text: Arc::new(Mutex::new(None)),
+            shared_text: Arc::new(Mutex::new(ClipboardState::default())),
             backend_origin: Arc::new(Mutex::new(DEFAULT_BACKEND_ORIGIN.to_string())),
             room_id: Arc::new(Mutex::new(None)),
             download_origins: Arc::new(Mutex::new(Default::default())),
@@ -95,13 +112,41 @@ struct KeyState {
 #[tauri::command]
 fn set_shared_text(runtime: State<'_, DesktopRuntime>, text: Option<String>) {
     if let Ok(mut current) = runtime.shared_text.lock() {
-        *current = text.filter(|value| !value.is_empty());
+        current.cache_text(text);
         #[cfg(target_os = "macos")]
         eprintln!(
             "[clipboard] room text cache: {}",
-            if current.is_some() { "ready" } else { "empty" }
+            if current.text.is_some() {
+                "ready"
+            } else {
+                "empty"
+            }
         );
     }
+}
+
+#[tauri::command]
+fn set_clipboard_sharing(runtime: State<'_, DesktopRuntime>, enabled: bool) {
+    if let Ok(mut clipboard) = runtime.shared_text.lock() {
+        clipboard.set_enabled(enabled);
+    }
+}
+
+#[tauri::command]
+fn show_main_window(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("main") {
+        window.show().map_err(|error| error.to_string())?;
+        window.unminimize().map_err(|error| error.to_string())?;
+        window.set_focus().map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn show_floating_menu(window: tauri::WebviewWindow) -> tauri::Result<()> {
+    let hide = MenuItem::with_id(&window, "hide-floating", "隐藏悬浮窗", true, None::<&str>)?;
+    let menu = Menu::with_items(&window, &[&hide])?;
+    window.popup_menu(&menu)
 }
 
 fn http_url(value: &str) -> Result<reqwest::Url, String> {
@@ -182,7 +227,7 @@ fn set_upload_target(runtime: State<'_, DesktopRuntime>, room_id: Option<String>
     if let Ok(mut current) = runtime.room_id.lock() {
         if *current != room_id {
             if let Ok(mut text) = runtime.shared_text.lock() {
-                *text = None;
+                text.text = None;
             }
         }
         *current = room_id;
@@ -715,15 +760,21 @@ fn start_floating_upload(app: tauri::AppHandle, runtime: DesktopRuntime, path: P
 }
 
 #[cfg(target_os = "macos")]
-fn start_keyboard_listener(app: tauri::AppHandle, shared_text: Arc<Mutex<Option<String>>>) {
+fn start_keyboard_listener(app: tauri::AppHandle, shared_text: Arc<Mutex<ClipboardState>>) {
     macos_keyboard::start(app, shared_text);
 }
 
 #[cfg(target_os = "macos")]
-fn read_copied_text(app: tauri::AppHandle) {
+fn read_copied_text(app: tauri::AppHandle, shared_text: Arc<Mutex<ClipboardState>>) {
     thread::spawn(move || {
         // Wait for the foreground application to handle the forwarded copy key.
         thread::sleep(Duration::from_millis(90));
+        let Ok(state) = shared_text.lock() else {
+            return;
+        };
+        if !state.enabled {
+            return;
+        }
         let result = objc2::rc::autoreleasepool(|_| -> Result<(), String> {
             let mut clipboard = Clipboard::new().map_err(|error| error.to_string())?;
             if clipboard
@@ -749,7 +800,7 @@ fn read_copied_text(app: tauri::AppHandle) {
 }
 
 #[cfg(not(target_os = "macos"))]
-fn start_keyboard_listener(app: tauri::AppHandle, shared_text: Arc<Mutex<Option<String>>>) {
+fn start_keyboard_listener(app: tauri::AppHandle, shared_text: Arc<Mutex<ClipboardState>>) {
     thread::spawn(move || {
         let keys = Arc::new(Mutex::new(KeyState::default()));
         let callback_keys = Arc::clone(&keys);
@@ -757,6 +808,13 @@ fn start_keyboard_listener(app: tauri::AppHandle, shared_text: Arc<Mutex<Option<
             let Ok(mut state) = callback_keys.lock() else {
                 return;
             };
+            let Ok(clipboard_state) = shared_text.lock() else {
+                return;
+            };
+            if !clipboard_state.enabled {
+                *state = KeyState::default();
+                return;
+            }
             let pressed = matches!(event.event_type, EventType::KeyPress(_));
             let released = matches!(event.event_type, EventType::KeyRelease(_));
             let key = match event.event_type {
@@ -777,9 +835,16 @@ fn start_keyboard_listener(app: tauri::AppHandle, shared_text: Arc<Mutex<Option<
                 Key::KeyC if pressed && !state.c && shortcut_modifier => {
                     state.c = true;
                     let copy_app = app.clone();
+                    let copy_state = shared_text.clone();
                     thread::spawn(move || {
                         // Let the application receiving Ctrl/Cmd+C populate the clipboard first.
                         thread::sleep(Duration::from_millis(90));
+                        let Ok(state) = copy_state.lock() else {
+                            return;
+                        };
+                        if !state.enabled {
+                            return;
+                        }
                         let Ok(mut clipboard) = Clipboard::new() else {
                             return;
                         };
@@ -804,7 +869,7 @@ fn start_keyboard_listener(app: tauri::AppHandle, shared_text: Arc<Mutex<Option<
                 }
                 Key::KeyV if pressed && !state.v && shortcut_modifier => {
                     state.v = true;
-                    let text = shared_text.lock().ok().and_then(|value| value.clone());
+                    let text = clipboard_state.text.clone();
                     if let Some(text) = text {
                         if let Ok(mut clipboard) = Clipboard::new() {
                             let _ = clipboard.set_text(text);
@@ -888,27 +953,35 @@ fn create_main_window(app: &tauri::AppHandle, data_directory: &Path) -> tauri::R
     Ok(())
 }
 
-#[cfg(windows)]
 fn create_floating_window(app: &tauri::AppHandle, data_directory: &Path) -> tauri::Result<()> {
     let dev_url = if cfg!(dev) {
         app.config().build.dev_url.clone()
     } else {
         None
     };
-    WebviewWindowBuilder::new(app, "floating", WebviewUrl::App("floating.html".into()))
-        .on_navigation(move |url| trusted_navigation(url, dev_url.as_ref()))
-        .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny)
-        .title("ClipBox Floating Ball")
-        .inner_size(96.0, 96.0)
-        .resizable(false)
-        .decorations(false)
-        .transparent(true)
-        .shadow(false)
-        .always_on_top(true)
-        .skip_taskbar(true)
-        .position(48.0, 96.0)
-        .data_directory(data_directory.to_path_buf())
-        .build()?;
+    let builder =
+        WebviewWindowBuilder::new(app, "floating", WebviewUrl::App("floating.html".into()))
+            .on_navigation(move |url| trusted_navigation(url, dev_url.as_ref()))
+            .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny)
+            .on_menu_event(|window, event| {
+                if event.id.as_ref() == "hide-floating" {
+                    let _ = window.hide();
+                }
+            })
+            .title("ClipBox Floating Ball")
+            .inner_size(48.0, 48.0)
+            .resizable(false)
+            .decorations(false)
+            .transparent(true)
+            .shadow(false)
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .position(48.0, 96.0)
+            .data_directory(data_directory.to_path_buf());
+    // Match the main window's portable WKWebView storage setup on macOS.
+    #[cfg(target_os = "macos")]
+    let builder = builder.incognito(true);
+    builder.build()?;
     Ok(())
 }
 
@@ -926,6 +999,9 @@ pub fn run() {
         .manage(DesktopRuntime::default())
         .invoke_handler(tauri::generate_handler![
             set_shared_text,
+            set_clipboard_sharing,
+            show_main_window,
+            show_floating_menu,
             set_backend_origin,
             set_upload_target,
             save_room_file,
@@ -949,16 +1025,13 @@ pub fn run() {
             let data_directory =
                 create_dir_under_executable("data").map_err(std::io::Error::other)?;
             create_main_window(app.handle(), &data_directory)?;
-            #[cfg(windows)]
             create_floating_window(app.handle(), &data_directory)?;
 
             let show = MenuItem::with_id(app, "show", "打开 ClipBox", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-            #[cfg(windows)]
             let floating =
-                MenuItem::with_id(app, "toggle-floating", "隐藏悬浮球", true, None::<&str>)?;
+                MenuItem::with_id(app, "toggle-floating", "显示悬浮窗", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show, &quit])?;
-            #[cfg(windows)]
             menu.append(&floating)?;
 
             let mut tray = TrayIconBuilder::new()
@@ -966,8 +1039,6 @@ pub fn run() {
                 .tooltip("ClipBox")
                 .show_menu_on_left_click(false)
                 .on_menu_event({
-                    #[cfg(windows)]
-                    let floating_item = floating.clone();
                     move |app, event| match event.id.as_ref() {
                         "show" => {
                             if let Some(window) = app.get_webview_window("main") {
@@ -976,20 +1047,9 @@ pub fn run() {
                             }
                         }
                         "quit" => app.exit(0),
-                        #[cfg(windows)]
                         "toggle-floating" => {
                             if let Some(window) = app.get_webview_window("floating") {
-                                let visible = window.is_visible().unwrap_or(false);
-                                if visible {
-                                    let _ = window.hide();
-                                } else {
-                                    let _ = window.show();
-                                }
-                                let _ = floating_item.set_text(if visible {
-                                    "显示悬浮球"
-                                } else {
-                                    "隐藏悬浮球"
-                                });
+                                let _ = window.show();
                             }
                         }
                         _ => {}
@@ -1060,6 +1120,24 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn disabling_clipboard_sharing_discards_and_rejects_room_text() {
+        let mut state = super::ClipboardState::default();
+        state.cache_text(Some("before joining".into()));
+        assert!(state.text.is_none());
+        state.set_enabled(true);
+        state.cache_text(Some("room text".into()));
+        assert_eq!(state.text.as_deref(), Some("room text"));
+        state.set_enabled(false);
+        assert!(state.text.is_none());
+        state.cache_text(Some("received while disabled".into()));
+        assert!(state.text.is_none());
+        state.set_enabled(true);
+        assert!(state.text.is_none());
+        state.cache_text(Some("latest room text".into()));
+        assert_eq!(state.text.as_deref(), Some("latest room text"));
+    }
+
     use super::*;
 
     #[test]

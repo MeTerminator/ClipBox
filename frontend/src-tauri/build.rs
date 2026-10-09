@@ -2,6 +2,9 @@ fn main() {
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
         tauri_build::AppManifest::new().commands(&[
             "set_shared_text",
+            "set_clipboard_sharing",
+            "show_main_window",
+            "show_floating_menu",
             "set_backend_origin",
             "set_upload_target",
             "save_room_file",

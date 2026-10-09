@@ -6,6 +6,8 @@
   ],
   "permissions": [
     "allow-set-shared-text",
+    "allow-set-clipboard-sharing",
+    "allow-show-main-window",
     "allow-set-backend-origin",
     "allow-set-upload-target",
     "allow-save-room-file",

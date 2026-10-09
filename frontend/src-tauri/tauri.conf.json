@@ -10,6 +10,7 @@
     "frontendDist": "../../www"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [],
     "security": {
       "csp": "default-src 'self'; img-src 'self' asset: data: blob: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' ipc: http: https: ws: wss:; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"

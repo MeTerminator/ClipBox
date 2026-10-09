@@ -60,6 +60,7 @@
           <Button variant="link" class="h-auto p-0 font-mono text-muted-foreground" @click="copyRoomID">{{ session.room.id }} <CopyIcon /></Button>
         </div>
         <div class="flex flex-wrap gap-2">
+          <Button v-if="isDesktopClient()" variant="outline" size="sm" :aria-pressed="clipboardSharing" :title="t('rooms.clipboardSharingHint')" @click="clipboardSharing = !clipboardSharing"><ClipboardIcon />{{ clipboardSharing ? t("rooms.clipboardSharingOn") : t("rooms.clipboardSharingOff") }}</Button>
           <Badge :variant="connected ? 'default' : 'secondary'" class="h-9 px-3">{{ connected ? t("rooms.online") : t("rooms.offline") }}</Badge>
           <Button variant="outline" size="sm" @click="copyInvite"><LinkIcon />{{ t("rooms.copyLink") }}</Button>
           <Button variant="outline" size="sm" @click="openPasswordDialog"><KeyRoundIcon />{{ t("rooms.setPassword") }}</Button>
@@ -160,6 +161,7 @@ import {
   listenForDesktopCopies,
   saveDesktopRoomFile,
   setDesktopSharedText,
+  setDesktopClipboardSharing,
   setDesktopUploadTarget,
 } from "@/lib/desktop";
 import { Input } from "@/components/ui/input";
@@ -189,6 +191,7 @@ const messages = ref<RoomMessage[]>([]);
 const draft = ref("");
 const busy = ref(false);
 const connected = ref(false);
+const clipboardSharing = ref(localStorage.getItem("desktopClipboardSharing") !== "false");
 const fileInput = ref<HTMLInputElement | null>(null);
 const showCreate = ref(false);
 const editingName = ref(false);
@@ -306,8 +309,8 @@ function connectSocket() {
 }
 async function handleSocketEvent(event: MessageEvent<string>) {
   let data: Record<string, unknown>; try { data = JSON.parse(event.data) as Record<string, unknown>; } catch { return; }
-  if (data.type === "ready") { connected.value = true; if (session.value) session.value.room = data.room as RoomInfo; messages.value = (data.messages as RoomMessage[]) || []; messages.value.forEach((message) => void autoDownloadRoomFile(message)); const latestClipboard = [...messages.value].reverse().find((message) => message.kind === "text" && message.source === "clipboard"); await setDesktopSharedText(latestClipboard?.text || null); await scrollBottom(); }
-  else if (data.type === "message") { const message = data.message as RoomMessage; if (!messages.value.some((item) => item.id === message.id)) messages.value.push(message); void autoDownloadRoomFile(message); if (message.kind === "text" && message.source === "clipboard") await setDesktopSharedText(message.text); await scrollBottom(); }
+  if (data.type === "ready") { connected.value = true; if (session.value) session.value.room = data.room as RoomInfo; messages.value = (data.messages as RoomMessage[]) || []; messages.value.forEach((message) => void autoDownloadRoomFile(message)); const latestClipboard = [...messages.value].reverse().find((message) => message.kind === "text" && message.source === "clipboard"); await setDesktopSharedText(clipboardSharing.value ? latestClipboard?.text || null : null); await scrollBottom(); }
+  else if (data.type === "message") { const message = data.message as RoomMessage; if (!messages.value.some((item) => item.id === message.id)) messages.value.push(message); void autoDownloadRoomFile(message); if (clipboardSharing.value && message.kind === "text" && message.source === "clipboard") await setDesktopSharedText(message.text); await scrollBottom(); }
   else if (data.type === "presence" && session.value) { session.value.room.members = (data.members as RoomInfo["members"]) || []; saveSession(session.value); }
   else if (data.type === "member_updated" && session.value) {
     const member = data.member as RoomInfo["members"][number];
@@ -400,6 +403,23 @@ async function sendRoomFileCode(code: string, roomId: string) {
   if (!connected.value || session.value?.room.id !== roomId) throw new Error(t("rooms.uploadRoomChanged"));
   sendMessage({ kind: "file", source: "user", file_code: code });
 }
+// Serialize native updates so rapid room/connection changes finish in the latest state.
+let clipboardUpdate = Promise.resolve();
+let clipboardRevision = 0;
+watch([clipboardSharing, connected, () => session.value?.room.id], () => {
+  localStorage.setItem("desktopClipboardSharing", String(clipboardSharing.value));
+  const enabled = clipboardSharing.value && connected.value && Boolean(session.value);
+  const revision = ++clipboardRevision;
+  clipboardUpdate = clipboardUpdate.catch(() => undefined).then(async () => {
+    if (revision !== clipboardRevision) return;
+    await setDesktopClipboardSharing(enabled);
+    if (enabled && revision === clipboardRevision) {
+      const latest = [...messages.value].reverse().find((message) => message.kind === "text" && message.source === "clipboard");
+      await setDesktopSharedText(latest?.text || null);
+    }
+  });
+  void clipboardUpdate.catch((error) => toast.error(errorMessage(error)));
+}, { immediate: true, flush: "sync" });
 watch(session, (value) => {
   setRoomFileDropHandler(value ? processRoomFile : null);
   setRoomFileCodeHandler(value ? sendRoomFileCode : null);
@@ -408,10 +428,10 @@ watch(session, (value) => {
 onMounted(async () => {
   const id = String(route.params.roomID || ""); const saved = savedRooms.value.find((room) => room.id === id); if (saved) void openSavedRoom(saved);
   stopDesktopCopyListener = await listenForDesktopCopies((text) => {
-    if (!connected.value || !session.value || !text.trim()) return;
+    if (!clipboardSharing.value || !connected.value || !session.value || !text.trim()) return;
     try { void setDesktopSharedText(text).catch(() => undefined); sendMessage({ kind: "text", source: "clipboard", text }); } catch (error) { toast.error(errorMessage(error)); }
   });
-  if (isDesktopClient()) toast.info(t("rooms.desktopClipboardReady"));
+  if (isDesktopClient() && clipboardSharing.value) toast.info(t("rooms.desktopClipboardReady"));
 });
-onBeforeUnmount(() => { stopDesktopCopyListener?.(); void setDesktopSharedText(null); setRoomFileDropHandler(null); setRoomFileCodeHandler(null); void setDesktopUploadTarget(null); closeSocket(); });
+onBeforeUnmount(() => { clipboardRevision++; stopDesktopCopyListener?.(); clipboardUpdate = clipboardUpdate.catch(() => undefined).then(() => setDesktopClipboardSharing(false)); void clipboardUpdate.catch(() => undefined); void setDesktopSharedText(null); setRoomFileDropHandler(null); setRoomFileCodeHandler(null); void setDesktopUploadTarget(null); closeSocket(); });
 </script>

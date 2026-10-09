@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-show-floating-menu"
+description = "Enables the show_floating_menu command without any pre-configured scope."
+commands.allow = ["show_floating_menu"]
+
+[[permission]]
+identifier = "deny-show-floating-menu"
+description = "Denies the show_floating_menu command without any pre-configured scope."
+commands.deny = ["show_floating_menu"]

@@ -66,7 +66,7 @@ import {
 import FileDetailModal from "@/components/FileDetailModal.vue";
 import { roomFileCodeHandler, roomFileDropHandler } from "@/composables/fileDropTarget";
 import { useFileUpload } from "@/composables/useFileUpload";
-import { listenForFloatingUploads, type FloatingUploadPayload } from "@/lib/desktop";
+import { showDesktopMainWindow, listenForFloatingUploads, type FloatingUploadPayload } from "@/lib/desktop";
 import type { ClipRecord } from "@/types";
 
 const { locale, t } = useI18n();
@@ -206,6 +206,7 @@ const handleFloatingUpload = async (payload: FloatingUploadPayload) => {
   localStorage.setItem("clipHistory", JSON.stringify([item, ...history.filter((entry) => entry.code !== item.code)].slice(0, 20)));
   dropResult.value = item;
   dropResultOpen.value = true;
+  await showDesktopMainWindow();
 };
 
 const setTheme = (value: unknown) => {

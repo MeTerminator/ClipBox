@@ -68,7 +68,7 @@ fn shortcut(event_type: u32, key: i64, flags: u64, repeat: i64) -> Option<Shortc
 
 struct Context {
     app: tauri::AppHandle,
-    text: Arc<Mutex<Option<String>>>,
+    text: Arc<Mutex<super::ClipboardState>>,
     tap: Ref,
 }
 
@@ -88,6 +88,9 @@ unsafe extern "C" fn callback(
         eprintln!("[clipboard] keyboard tap re-enabled after macOS disabled it");
         return event;
     }
+    if !context.text.lock().is_ok_and(|state| state.enabled) {
+        return event;
+    }
     if event.is_null() {
         return event;
     }
@@ -105,11 +108,16 @@ unsafe extern "C" fn callback(
         objc2::rc::autoreleasepool(|_| match action {
             Some(Shortcut::Copy) => {
                 eprintln!("[clipboard] Command+C received");
-                super::read_copied_text(context.app.clone());
+                super::read_copied_text(context.app.clone(), context.text.clone());
             }
             Some(Shortcut::Paste) => {
-                let text = context.text.lock().ok().and_then(|value| value.clone());
-                if let Some(text) = text {
+                let Ok(state) = context.text.lock() else {
+                    return;
+                };
+                if !state.enabled {
+                    return;
+                }
+                if let Some(text) = state.text.clone() {
                     // An active Session tap holds delivery until this returns, so
                     // the receiving application sees the new clipboard on Cmd+V.
                     match Clipboard::new().and_then(|mut clipboard| clipboard.set_text(text)) {
@@ -133,7 +141,7 @@ unsafe extern "C" fn callback(
     event
 }
 
-pub fn start(app: tauri::AppHandle, text: Arc<Mutex<Option<String>>>) {
+pub fn start(app: tauri::AppHandle, text: Arc<Mutex<super::ClipboardState>>) {
     // Called from Tauri setup on the main thread. Prompt once; granting is async.
     let options = CFDictionary::from_CFType_pairs(&[(
         CFString::new("AXTrustedCheckOptionPrompt"),

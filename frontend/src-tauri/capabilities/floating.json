@@ -1,0 +1,6 @@
+{
+  "identifier": "floating-commands",
+  "description": "Floating window controls for opening the main window and its hide menu.",
+  "windows": ["floating"],
+  "permissions": ["allow-show-main-window", "allow-show-floating-menu"]
+}

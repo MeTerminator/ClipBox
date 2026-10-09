@@ -52,3 +52,15 @@ export async function saveDesktopRoomFile(url: string, token: string, filename: 
   const { invoke } = await import("@tauri-apps/api/core");
   return invoke<string>("save_room_file", { url, token, filename });
 }
+
+export async function setDesktopClipboardSharing(enabled: boolean): Promise<void> {
+  if (!isDesktopClient()) return;
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("set_clipboard_sharing", { enabled });
+}
+
+export async function showDesktopMainWindow(): Promise<void> {
+  if (!isDesktopClient()) return;
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("show_main_window");
+}
