@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-reveal-room-file"
+description = "Enables the reveal_room_file command without any pre-configured scope."
+commands.allow = ["reveal_room_file"]
+
+[[permission]]
+identifier = "deny-reveal-room-file"
+description = "Denies the reveal_room_file command without any pre-configured scope."
+commands.deny = ["reveal_room_file"]

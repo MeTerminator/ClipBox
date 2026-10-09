@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-save-room-file-as"
+description = "Enables the save_room_file_as command without any pre-configured scope."
+commands.allow = ["save_room_file_as"]
+
+[[permission]]
+identifier = "deny-save-room-file-as"
+description = "Denies the save_room_file_as command without any pre-configured scope."
+commands.deny = ["save_room_file_as"]

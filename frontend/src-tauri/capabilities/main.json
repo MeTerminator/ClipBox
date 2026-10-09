@@ -11,6 +11,9 @@
     "allow-set-backend-origin",
     "allow-set-upload-target",
     "allow-save-room-file",
+    "allow-save-room-file-as",
+    "allow-room-file-exists",
+    "allow-reveal-room-file",
     "allow-save-portable-storage",
     "core:event:allow-emit"
   ]

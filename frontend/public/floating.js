@@ -8,12 +8,13 @@ let stage = "idle";
 let dragging = false;
 
 function updateView() {
-  const view = ["hashing", "uploading"].includes(stage) ? "progress"
+  const view = dragging ? "upload"
+    : ["hashing", "uploading"].includes(stage) ? "progress"
     : stage === "error" ? "error"
     : ["complete", "shared"].includes(stage) ? "complete"
-    : dragging ? "upload" : "logo";
-  views.forEach((id) => { document.getElementById(id).hidden = id !== view; });
-  ball.classList.toggle("dragging", dragging && stage === "idle");
+    : "logo";
+  views.forEach((id) => { document.getElementById(id).toggleAttribute("hidden", id !== view); });
+  ball.classList.toggle("dragging", dragging);
   ball.classList.toggle("error", stage === "error");
 }
 

@@ -8,6 +8,9 @@ fn main() {
             "set_backend_origin",
             "set_upload_target",
             "save_room_file",
+            "save_room_file_as",
+            "room_file_exists",
+            "reveal_room_file",
             "save_portable_storage",
         ]),
     ))

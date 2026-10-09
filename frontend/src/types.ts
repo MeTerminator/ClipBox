@@ -68,6 +68,7 @@ export interface RoomHistoryRecord {
 export type PickupHistoryRecord = ClipRecord | RoomHistoryRecord;
 
 export interface RoomFile {
+  sha1?: string;
   name: string;
   size: number;
   mime_type: string;

@@ -47,20 +47,19 @@
 
   <div v-else class="space-y-4">
     <Card>
-      <CardHeader class="gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div class="space-y-1">
-          <form v-if="editingName" class="flex gap-2" @submit.prevent="saveRoomName">
+      <CardHeader class="gap-4">
+        <div class="flex min-w-0 items-center justify-between gap-4">
+          <form v-if="editingName" class="flex min-w-0 flex-1 gap-2" @submit.prevent="saveRoomName">
             <Input v-model="roomNameDraft" maxlength="80" autofocus />
             <Button type="submit" size="icon" :disabled="busy"><CheckIcon /></Button>
           </form>
-          <CardTitle v-else class="flex items-center gap-2">
-            {{ session.room.name || t("rooms.unnamed") }}
-            <Button variant="ghost" size="icon-sm" @click="startEditingName"><PencilIcon /></Button>
+          <CardTitle v-else class="flex min-w-0 items-center gap-2 text-3xl font-semibold sm:text-4xl">
+            <span class="truncate">{{ session.room.name || t("rooms.unnamed") }}</span>
+            <Button variant="ghost" size="icon-sm" class="shrink-0" @click="startEditingName"><PencilIcon /></Button>
           </CardTitle>
-          <Button variant="link" class="h-auto p-0 font-mono text-muted-foreground" @click="copyRoomID">{{ session.room.id }} <CopyIcon /></Button>
+          <Button variant="link" class="h-auto shrink-0 p-0 font-mono text-3xl font-semibold tabular-nums sm:text-4xl" :title="t('rooms.copyRoomID')" @click="copyRoomID">{{ session.room.id }} <CopyIcon class="size-4 sm:size-5" /></Button>
         </div>
         <div class="flex flex-wrap gap-2">
-          <Button v-if="isDesktopClient()" variant="outline" size="sm" :aria-pressed="clipboardSharing" :title="t('rooms.clipboardSharingHint')" @click="clipboardSharing = !clipboardSharing"><ClipboardIcon />{{ clipboardSharing ? t("rooms.clipboardSharingOn") : t("rooms.clipboardSharingOff") }}</Button>
           <Badge :variant="connected ? 'default' : 'secondary'" class="h-9 px-3">{{ connected ? t("rooms.online") : t("rooms.offline") }}</Badge>
           <Button variant="outline" size="sm" @click="copyInvite"><LinkIcon />{{ t("rooms.copyLink") }}</Button>
           <Button variant="outline" size="sm" @click="openPasswordDialog"><KeyRoundIcon />{{ t("rooms.setPassword") }}</Button>
@@ -85,7 +84,7 @@
               <article v-for="message in messages" :key="message.id" :class="['flex flex-col gap-1', message.sender.id === session.room.current_member_id ? 'items-end' : 'items-start']">
                 <div class="flex items-center gap-2 text-xs text-muted-foreground"><ClipboardIcon v-if="message.source === 'clipboard'" class="size-4 text-amber-500" :title="t('rooms.clipboard')" /><span>{{ message.sender.nickname }}</span><span>{{ formatTime(message.created_at) }}</span></div>
                 <div v-if="message.kind === 'text'" class="max-w-[85%] whitespace-pre-wrap rounded-lg bg-muted px-3 py-2 text-sm">{{ message.text }}</div>
-                <Button v-else-if="message.file" variant="outline" class="h-auto max-w-[85%] justify-start py-3" @click="downloadFile(message)"><FileIcon /><span class="min-w-0 text-left"><span class="block truncate font-medium">{{ message.file.name }}</span><span class="block text-xs text-muted-foreground">{{ formatSize(message.file.size) }}</span></span><DownloadIcon /></Button>
+                <Button v-else-if="message.file" variant="outline" class="h-auto max-w-[85%] justify-start py-3" :title="roomFileActionTitle(message)" :disabled="downloadingRoomFiles.has(downloadedFileKey(message))" @click="downloadFile(message)"><FileIcon /><span class="min-w-0 text-left"><span class="block truncate font-medium">{{ message.file.name }}</span><span class="block text-xs text-muted-foreground">{{ formatSize(message.file.size) }}</span></span><LoaderCircleIcon v-if="downloadingRoomFiles.has(downloadedFileKey(message))" class="animate-spin" /><FolderOpenIcon v-else-if="isDesktopClient() && downloadedRoomFiles[downloadedFileKey(message)]" /><DownloadIcon v-else /></Button>
               </article>
             </div>
           </ScrollArea>
@@ -106,28 +105,45 @@
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader><CardTitle class="flex items-center justify-between text-base">{{ t("rooms.members") }}<Badge variant="secondary">{{ session.room.members.length }}</Badge></CardTitle></CardHeader>
-        <CardContent class="space-y-4">
-          <div v-for="member in session.room.members" :key="member.id" class="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted" :title="member.os" :aria-label="member.os">
-              <component :is="systemIcon(member)" class="size-4" />
-            </div>
-            <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
-              <form v-if="editingNickname && member.id === me?.id" class="flex min-w-[min(100%,14rem)] flex-1 flex-wrap gap-2" @submit.prevent="saveNickname">
-                <Input v-model="nicknameDraft" class="min-w-[8rem] flex-1" maxlength="40" autofocus />
-                <Button type="submit" size="icon" :disabled="busy"><CheckIcon /></Button>
-              </form>
-              <div v-else class="flex min-w-[min(100%,10rem)] flex-1 flex-wrap items-center gap-1">
-                <p class="flex min-w-0 items-center gap-1 truncate text-sm font-medium">{{ member.nickname }} <CrownIcon v-if="member.is_owner" class="size-3 shrink-0" /></p>
-                <Button v-if="member.id === me?.id" variant="ghost" size="icon-sm" @click="startEditingNickname"><PencilIcon /></Button>
+      <div class="space-y-4">
+        <Card v-if="isDesktopClient()">
+          <CardHeader><CardTitle class="text-right text-base">{{ t("rooms.deviceSettings") }}</CardTitle></CardHeader>
+          <CardContent class="space-y-4">
+            <label class="flex cursor-pointer items-center justify-end gap-3" :title="t('rooms.clipboardSharingHint')">
+              <span class="text-right text-sm">{{ t("rooms.clipboardSharing") }}</span>
+              <input v-model="clipboardSharing" type="checkbox" role="switch" class="peer sr-only" />
+              <span aria-hidden="true" class="relative h-5 w-9 shrink-0 rounded-full bg-muted-foreground/30 transition-colors after:absolute after:left-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-white after:transition-transform peer-checked:bg-primary peer-checked:after:translate-x-4 peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2" />
+            </label>
+            <label class="flex cursor-pointer items-center justify-end gap-3" :title="t('rooms.autoDownloadHint')">
+              <span class="text-right text-sm">{{ t("rooms.autoDownload") }}</span>
+              <input v-model="autoDownload" type="checkbox" role="switch" class="peer sr-only" />
+              <span aria-hidden="true" class="relative h-5 w-9 shrink-0 rounded-full bg-muted-foreground/30 transition-colors after:absolute after:left-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-white after:transition-transform peer-checked:bg-primary peer-checked:after:translate-x-4 peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2" />
+            </label>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle class="flex items-center justify-between text-base">{{ t("rooms.members") }}<Badge variant="secondary">{{ session.room.members.length }}</Badge></CardTitle></CardHeader>
+          <CardContent class="space-y-4">
+            <div v-for="member in session.room.members" :key="member.id" class="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted" :title="member.os" :aria-label="member.os">
+                <component :is="systemIcon(member)" class="size-4" />
               </div>
-              <p class="w-full truncate text-xs text-muted-foreground">{{ t("rooms.deviceInfo", member) }}</p>
+              <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+                <form v-if="editingNickname && member.id === me?.id" class="flex min-w-[min(100%,14rem)] flex-1 flex-wrap gap-2" @submit.prevent="saveNickname">
+                  <Input v-model="nicknameDraft" class="min-w-[8rem] flex-1" maxlength="40" autofocus />
+                  <Button type="submit" size="icon" :disabled="busy"><CheckIcon /></Button>
+                </form>
+                <div v-else class="flex min-w-[min(100%,10rem)] flex-1 flex-wrap items-center gap-1">
+                  <p class="flex min-w-0 items-center gap-1 truncate text-sm font-medium">{{ member.nickname }} <CrownIcon v-if="member.is_owner" class="size-3 shrink-0" /></p>
+                  <Button v-if="member.id === me?.id" variant="ghost" size="icon-sm" @click="startEditingNickname"><PencilIcon /></Button>
+                </div>
+                <p class="w-full truncate text-xs text-muted-foreground">{{ t("rooms.deviceInfo", member) }}</p>
+              </div>
+              <span :class="['size-2 shrink-0 rounded-full', member.online ? 'bg-emerald-500' : 'bg-muted-foreground/40']" />
             </div>
-            <span :class="['size-2 shrink-0 rounded-full', member.online ? 'bg-emerald-500' : 'bg-muted-foreground/40']" />
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   </div>
 
@@ -160,6 +176,9 @@ import {
   isDesktopClient,
   listenForDesktopCopies,
   saveDesktopRoomFile,
+  saveDesktopRoomFileAs,
+  desktopRoomFileExists,
+  revealDesktopRoomFile,
   setDesktopSharedText,
   setDesktopClipboardSharing,
   setDesktopUploadTarget,
@@ -177,7 +196,7 @@ import AppleLogo from "@/components/icons/AppleLogo.vue";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { RoomInfo, RoomMember, RoomMessage, RoomSession, SavedRoom } from "@/types";
-import { ArrowLeftIcon, CheckIcon, ChevronRightIcon, ClipboardIcon, CopyIcon, CrownIcon, DownloadIcon, FileIcon, KeyRoundIcon, LinkIcon, LockIcon, LogInIcon, LogOutIcon, MessagesSquareIcon, MonitorIcon, PaperclipIcon, PencilIcon, PlusIcon, SendIcon, SmartphoneIcon, TabletIcon, TerminalIcon, Trash2Icon } from "@lucide/vue";
+import { ArrowLeftIcon, CheckIcon, ChevronRightIcon, ClipboardIcon, CopyIcon, CrownIcon, DownloadIcon, FileIcon, FolderOpenIcon, LoaderCircleIcon, KeyRoundIcon, LinkIcon, LockIcon, LogInIcon, LogOutIcon, MessagesSquareIcon, MonitorIcon, PaperclipIcon, PencilIcon, PlusIcon, SendIcon, SmartphoneIcon, TabletIcon, TerminalIcon, Trash2Icon } from "@lucide/vue";
 
 class HTTPError extends Error { constructor(message: string, public readonly status: number) { super(message); } }
 
@@ -192,6 +211,7 @@ const draft = ref("");
 const busy = ref(false);
 const connected = ref(false);
 const clipboardSharing = ref(localStorage.getItem("desktopClipboardSharing") !== "false");
+const autoDownload = ref(localStorage.getItem("desktopAutoDownload") !== "false");
 const fileInput = ref<HTMLInputElement | null>(null);
 const showCreate = ref(false);
 const editingName = ref(false);
@@ -202,8 +222,9 @@ const passwordOpen = ref(false);
 const passwordDraft = ref("");
 const { uploadStage, uploadProgress, uploadFile, resetUploadProgress } = useFileUpload();
 const savedRooms = ref<SavedRoom[]>(loadSavedRooms());
-const downloadedRoomFiles = new Set(loadDownloadedRoomFiles());
-const downloadingRoomFiles = new Set<string>();
+const downloadedRoomFiles = ref<Record<string, string>>(loadDownloadedRoomFiles());
+const downloadingRoomFiles = reactive(new Set<string>());
+const roomDownloads = new Map<string, Promise<string | null>>();
 let socket: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 let pingTimer: ReturnType<typeof setInterval> | undefined;
@@ -213,46 +234,74 @@ const me = computed(() => session.value?.room.members.find((member) => member.id
 
 function errorMessage(error: unknown) { return error instanceof Error ? error.message : t("rooms.unknownError"); }
 function loadSavedRooms(): SavedRoom[] { try { return JSON.parse(localStorage.getItem("shareRooms") || "[]") as SavedRoom[]; } catch { return []; } }
-function loadDownloadedRoomFiles(): string[] {
+function loadDownloadedRoomFiles(): Record<string, string> {
   try {
-    const stored: unknown = JSON.parse(localStorage.getItem("downloadedRoomFiles") || "[]");
-    return Array.isArray(stored) ? stored.filter((key): key is string => typeof key === "string") : [];
-  } catch { return []; }
+    const stored: unknown = JSON.parse(localStorage.getItem("downloadedRoomFilePaths") || "{}");
+    if (!stored || typeof stored !== "object" || Array.isArray(stored)) return {};
+    return Object.fromEntries(Object.entries(stored).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+  } catch { return {}; }
 }
 function downloadedFileKey(message: RoomMessage) {
+  // Content identity works across repeated messages, renamed files and rooms.
+  if (message.file?.sha1) return `${backendOrigin}:sha1:${message.file.sha1}:${message.file.size}`;
   const room = session.value?.room;
   return `${backendOrigin}:${room?.id || ""}:${room?.created_at || ""}:${message.id}`;
 }
-function markDownloadedRoomFile(key: string) {
-  downloadedRoomFiles.add(key);
-  localStorage.setItem("downloadedRoomFiles", JSON.stringify([...downloadedRoomFiles].slice(-500)));
+function rememberRoomFile(key: string, path: string | null) {
+  if (path) downloadedRoomFiles.value[key] = path;
+  else delete downloadedRoomFiles.value[key];
+  localStorage.setItem("downloadedRoomFilePaths", JSON.stringify(downloadedRoomFiles.value));
 }
-async function saveRoomDownload(message: RoomMessage, token: string): Promise<string> {
-  if (!message.file) throw new Error(t("rooms.unknownError"));
-  const directURL = await uploadBackendURL(message.file.download_url);
-  const fallbackURL = backendURL(message.file.download_url);
-  try {
-    return await saveDesktopRoomFile(directURL, token, message.file.name);
-  } catch (error) {
-    if (directURL === fallbackURL) throw error;
-    return saveDesktopRoomFile(fallbackURL, token, message.file.name);
-  }
+function roomFileActionTitle(message: RoomMessage) {
+  if (!isDesktopClient()) return t("clip.download");
+  if (downloadedRoomFiles.value[downloadedFileKey(message)]) return t("rooms.openFileFolder");
+  return autoDownload.value ? t("clip.download") : t("rooms.saveFileAs");
+}
+function saveRoomDownload(message: RoomMessage, saveAs = false): Promise<string | null> {
+  if (!message.file || !session.value) return Promise.reject(new Error(t("rooms.unknownError")));
+  const key = downloadedFileKey(message);
+  const pending = roomDownloads.get(key);
+  if (pending) return pending;
+  const token = session.value.token;
+  const file = message.file;
+  downloadingRoomFiles.add(key);
+  const task = (async () => {
+    const previous = downloadedRoomFiles.value[key];
+    if (previous && await desktopRoomFileExists(previous)) return previous;
+    if (previous) rememberRoomFile(key, null);
+    const directURL = await uploadBackendURL(file.download_url);
+    const fallbackURL = backendURL(file.download_url);
+    let path: string | null;
+    if (saveAs) {
+      path = await saveDesktopRoomFileAs(directURL, fallbackURL, token, file.name);
+    } else {
+      try {
+        path = await saveDesktopRoomFile(directURL, token, file.name);
+      } catch (error) {
+        if (directURL === fallbackURL) throw error;
+        path = await saveDesktopRoomFile(fallbackURL, token, file.name);
+      }
+    }
+    if (path) rememberRoomFile(key, path);
+    return path;
+  })().finally(() => {
+    downloadingRoomFiles.delete(key);
+    roomDownloads.delete(key);
+  });
+  roomDownloads.set(key, task);
+  return task;
 }
 async function autoDownloadRoomFile(message: RoomMessage) {
-  if (!isDesktopClient() || !message.file || !session.value) return;
+  if (!isDesktopClient() || !autoDownload.value || !message.file || !session.value) return;
   if (message.sender.id === session.value.room.current_member_id) return;
   const key = downloadedFileKey(message);
-  if (downloadedRoomFiles.has(key) || downloadingRoomFiles.has(key)) return;
-  downloadingRoomFiles.add(key);
-  const token = session.value.token;
+  if (roomDownloads.has(key)) return;
+  const previous = downloadedRoomFiles.value[key];
   try {
-    const path = await saveRoomDownload(message, token);
-    markDownloadedRoomFile(key);
-    toast.success(t("rooms.fileAutoDownloaded", { path }));
+    const path = await saveRoomDownload(message);
+    if (path && path !== previous) toast.success(t("rooms.fileAutoDownloaded", { path }));
   } catch (error) {
-    toast.error(error instanceof Error ? error.message : t("rooms.unknownError"));
-  } finally {
-    downloadingRoomFiles.delete(key);
+    toast.error(errorMessage(error));
   }
 }
 function saveSession(value: RoomSession) {
@@ -333,12 +382,15 @@ async function sendFile(event: Event) { const input = event.target as HTMLInputE
 async function downloadFile(message: RoomMessage) {
   if (!message.file || !session.value) return;
   if (isDesktopClient()) {
-    const token = session.value.token;
     const key = downloadedFileKey(message);
     try {
-      const path = await saveRoomDownload(message, token);
-      markDownloadedRoomFile(key);
-      toast.success(t("rooms.fileSaved", { path }));
+      const previous = downloadedRoomFiles.value[key];
+      if (previous) {
+        if (await revealDesktopRoomFile(previous)) return;
+        rememberRoomFile(key, null);
+      }
+      const path = await saveRoomDownload(message, !autoDownload.value);
+      if (path) toast.success(t("rooms.fileSaved", { path }));
     } catch (error) {
       toast.error(errorMessage(error));
     }
@@ -403,6 +455,11 @@ async function sendRoomFileCode(code: string, roomId: string) {
   if (!connected.value || session.value?.room.id !== roomId) throw new Error(t("rooms.uploadRoomChanged"));
   sendMessage({ kind: "file", source: "user", file_code: code });
 }
+watch(autoDownload, (enabled) => {
+  localStorage.setItem("desktopAutoDownload", String(enabled));
+  if (enabled) messages.value.forEach((message) => void autoDownloadRoomFile(message));
+}, { flush: "sync" });
+
 // Serialize native updates so rapid room/connection changes finish in the latest state.
 let clipboardUpdate = Promise.resolve();
 let clipboardRevision = 0;

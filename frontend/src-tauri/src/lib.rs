@@ -356,6 +356,75 @@ async fn save_room_file(
     token: Option<String>,
     filename: String,
 ) -> Result<String, String> {
+    download_room_file(&runtime, url, token, filename, None).await
+}
+
+#[tauri::command]
+async fn save_room_file_as(
+    app: tauri::AppHandle,
+    runtime: State<'_, DesktopRuntime>,
+    url: String,
+    fallback_url: String,
+    token: Option<String>,
+    filename: String,
+) -> Result<Option<String>, String> {
+    {
+        let origins = runtime
+            .download_origins
+            .lock()
+            .map_err(|_| "runtime lock failed")?;
+        validate_download_url(&url, &origins)?;
+        validate_download_url(&fallback_url, &origins)?;
+    }
+    let mut dialog = rfd::AsyncFileDialog::new().set_file_name(safe_filename(&filename));
+    if let Some(window) = app.get_webview_window("main") {
+        dialog = dialog.set_parent(&window);
+    }
+    let Some(chosen) = dialog.save_file().await else {
+        return Ok(None);
+    };
+    let destination = chosen.path().to_path_buf();
+    match download_room_file(
+        &runtime,
+        url.clone(),
+        token.clone(),
+        filename.clone(),
+        Some(destination.clone()),
+    )
+    .await
+    {
+        Ok(path) => Ok(Some(path)),
+        Err(error) if url == fallback_url => Err(error),
+        Err(_) => download_room_file(&runtime, fallback_url, token, filename, Some(destination))
+            .await
+            .map(Some),
+    }
+}
+
+#[tauri::command]
+fn room_file_exists(path: String) -> bool {
+    Path::new(&path).is_absolute() && Path::new(&path).is_file()
+}
+
+#[tauri::command]
+fn reveal_room_file(path: String) -> Result<bool, String> {
+    if !room_file_exists(path.clone()) {
+        return Ok(false);
+    }
+    let directory = Path::new(&path)
+        .parent()
+        .ok_or("file has no parent directory")?;
+    open::that_detached(directory).map_err(|error| error.to_string())?;
+    Ok(true)
+}
+
+async fn download_room_file(
+    runtime: &DesktopRuntime,
+    url: String,
+    token: Option<String>,
+    filename: String,
+    destination: Option<PathBuf>,
+) -> Result<String, String> {
     let url = {
         let origins = runtime
             .download_origins
@@ -363,7 +432,6 @@ async fn save_room_file(
             .map_err(|_| "runtime lock failed")?;
         validate_download_url(&url, &origins)?
     };
-    let directory = create_dir_under_executable("downloads")?;
     let client = network_client()?;
     let mut request = client.get(url);
     if let Some(token) = token {
@@ -376,7 +444,17 @@ async fn save_room_file(
     if !response.status().is_success() {
         return Err(format!("download failed ({})", response.status()));
     }
-    let (path, mut file) = create_unique_download_file(&directory, &filename)?;
+    let (path, mut file, temporary) = if let Some(path) = destination {
+        let parent = path.parent().ok_or("save destination has no directory")?;
+        let staged = tempfile::NamedTempFile::new_in(parent)
+            .map_err(|error| format!("save failed: {error}"))?;
+        let (file, temporary) = staged.into_parts();
+        (path, file, Some(temporary))
+    } else {
+        let directory = create_dir_under_executable("downloads")?;
+        let (path, file) = create_unique_download_file(&directory, &filename)?;
+        (path, file, None)
+    };
     let result = async {
         while let Some(bytes) = response
             .chunk()
@@ -392,8 +470,16 @@ async fn save_room_file(
     .await;
     drop(file);
     if let Err(error) = result {
-        let _ = std::fs::remove_file(&path);
+        // Save As leaves any existing destination untouched on download failure.
+        if temporary.is_none() {
+            let _ = std::fs::remove_file(&path);
+        }
         return Err(error);
+    }
+    if let Some(temporary) = temporary {
+        temporary
+            .persist(&path)
+            .map_err(|error| format!("save failed: {error}"))?;
     }
     Ok(path.display().to_string())
 }
@@ -1005,6 +1091,9 @@ pub fn run() {
             set_backend_origin,
             set_upload_target,
             save_room_file,
+            save_room_file_as,
+            room_file_exists,
+            reveal_room_file,
             save_portable_storage
         ])
         .setup(|app| {
@@ -1085,7 +1174,9 @@ pub fn run() {
                 .clone();
             if window.label() == "floating" {
                 match event {
-                    WindowEvent::DragDrop(DragDropEvent::Enter { .. }) => {
+                    WindowEvent::DragDrop(
+                        DragDropEvent::Enter { .. } | DragDropEvent::Over { .. },
+                    ) => {
                         let _ = window
                             .app_handle()
                             .emit("floating://drag", FloatingDragPayload { dragging: true });
@@ -1139,6 +1230,78 @@ mod tests {
     }
 
     use super::*;
+
+    fn room_file_fixture(
+        body: &'static [u8],
+        declared_length: usize,
+    ) -> (DesktopRuntime, String, std::thread::JoinHandle<()>) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let origin = format!("http://{}", listener.local_addr().unwrap());
+        let runtime = DesktopRuntime::default();
+        runtime
+            .download_origins
+            .lock()
+            .unwrap()
+            .insert(origin.clone());
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = [0_u8; 4096];
+            stream.read(&mut request).unwrap();
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Length: {declared_length}\r\nConnection: close\r\n\r\n"
+            )
+            .unwrap();
+            stream.write_all(body).unwrap();
+        });
+        (
+            runtime,
+            format!("{origin}/api/rooms/12345/messages/1/file"),
+            server,
+        )
+    }
+
+    #[test]
+    fn save_as_replaces_destination_only_after_complete_download() {
+        let directory = tempfile::tempdir().unwrap();
+        let destination = directory.path().join("chosen.txt");
+        std::fs::write(&destination, b"previous").unwrap();
+        let (runtime, url, server) = room_file_fixture(b"new contents", 12);
+        let path = tauri::async_runtime::block_on(download_room_file(
+            &runtime,
+            url,
+            None,
+            "file.txt".into(),
+            Some(destination.clone()),
+        ))
+        .unwrap();
+        server.join().unwrap();
+        assert_eq!(path, destination.display().to_string());
+        assert_eq!(std::fs::read(&destination).unwrap(), b"new contents");
+        assert!(room_file_exists(path));
+        assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn interrupted_save_as_preserves_existing_file_and_cleans_partial_download() {
+        let directory = tempfile::tempdir().unwrap();
+        let destination = directory.path().join("chosen.txt");
+        std::fs::write(&destination, b"previous").unwrap();
+        let (runtime, url, server) = room_file_fixture(b"partial", 100);
+        let result = tauri::async_runtime::block_on(download_room_file(
+            &runtime,
+            url,
+            None,
+            "file.txt".into(),
+            Some(destination.clone()),
+        ));
+        server.join().unwrap();
+        assert!(result.is_err());
+        assert_eq!(std::fs::read(&destination).unwrap(), b"previous");
+        assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 1);
+        assert!(!room_file_exists(directory.path().display().to_string()));
+        assert!(!room_file_exists("relative-file.txt".into()));
+    }
 
     #[test]
     fn network_client_does_not_follow_redirects() {

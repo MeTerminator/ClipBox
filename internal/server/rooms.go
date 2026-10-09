@@ -376,7 +376,7 @@ func memberResponse(member model.RoomMember, online bool) gin.H {
 func roomMessageResponse(roomID string, message *model.RoomMessage) gin.H {
 	result := gin.H{"id": message.ID, "kind": message.Kind, "source": message.Source, "text": message.Text, "created_at": message.CreatedAt, "sender": memberResponse(message.Member, true)}
 	if message.File != nil {
-		result["file"] = gin.H{"name": message.File.Filename, "size": message.File.Size, "mime_type": message.File.MIMEType, "download_url": "/api/rooms/" + roomID + "/messages/" + strconv.FormatInt(message.ID, 10) + "/file"}
+		result["file"] = gin.H{"name": message.File.Filename, "sha1": message.File.SHA1, "size": message.File.Size, "mime_type": message.File.MIMEType, "download_url": "/api/rooms/" + roomID + "/messages/" + strconv.FormatInt(message.ID, 10) + "/file"}
 	}
 	return result
 }

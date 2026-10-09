@@ -64,3 +64,18 @@ export async function showDesktopMainWindow(): Promise<void> {
   const { invoke } = await import("@tauri-apps/api/core");
   await invoke("show_main_window");
 }
+
+export async function saveDesktopRoomFileAs(url: string, fallbackUrl: string, token: string, filename: string): Promise<string | null> {
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<string | null>("save_room_file_as", { url, fallbackUrl, token, filename });
+}
+
+export async function desktopRoomFileExists(path: string): Promise<boolean> {
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<boolean>("room_file_exists", { path });
+}
+
+export async function revealDesktopRoomFile(path: string): Promise<boolean> {
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<boolean>("reveal_room_file", { path });
+}

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-room-file-exists"
+description = "Enables the room_file_exists command without any pre-configured scope."
+commands.allow = ["room_file_exists"]
+
+[[permission]]
+identifier = "deny-room-file-exists"
+description = "Denies the room_file_exists command without any pre-configured scope."
+commands.deny = ["room_file_exists"]
