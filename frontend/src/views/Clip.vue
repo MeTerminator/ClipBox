@@ -272,6 +272,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "vue-sonner";
+import { pendingShareFile } from "@/composables/fileDropTarget";
 import { useFileUpload } from "@/composables/useFileUpload";
 import { backendURL } from "@/lib/backend";
 import type { ClipKind, ClipRecord } from "@/types";
@@ -324,6 +325,16 @@ watch(
     if (tab === "file") activeTab.value = "file";
   },
 );
+
+watch(pendingShareFile, (file) => {
+  if (!file) return;
+  pendingShareFile.value = null;
+  if (loading.value) return;
+  selectedFile.value = file;
+  activeTab.value = "file";
+  errorMsg.value = "";
+  resetUploadProgress();
+}, { immediate: true });
 
 const formatSize = (bytes: number) => {
   if (bytes === 0) return "0 B";

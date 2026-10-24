@@ -83,8 +83,8 @@ const messages = {
       redirectMsg: "Upload successful. Redirect to {domain}?",
       redirectBtn: "Redirect Now",
       stayBtn: "Stay Here",
-      dropToShare: "Drop to create a file share",
-      dropRelease: "Release the file to upload with default settings",
+      dropToShare: "Drop to select a file",
+      dropRelease: "Review access limits and expiration before uploading",
       units: {
         seconds: "Seconds",
         minutes: "Minutes",
@@ -246,8 +246,8 @@ const messages = {
       redirectMsg: "上传成功。是否跳转至 {domain}？",
       redirectBtn: "立即跳转",
       stayBtn: "留在当前页",
-      dropToShare: "拖放后创建文件分享",
-      dropRelease: "松开文件，将使用默认配置上传",
+      dropToShare: "拖放后选择文件",
+      dropRelease: "可设置访问次数和有效期，确认后再上传",
       units: {
         seconds: "秒",
         minutes: "分",

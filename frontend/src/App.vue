@@ -1,12 +1,12 @@
 <template>
   <Toaster position="top-right" :theme="resolvedTheme" rich-colors close-button />
 
-  <div v-if="draggingFile || uploadStage" class="fixed inset-4 z-[100] grid place-content-center justify-items-center gap-3 rounded-xl border-2 border-dashed bg-background/95 backdrop-blur-sm">
+  <div v-if="draggingFile" class="fixed inset-4 z-[100] grid place-content-center justify-items-center gap-3 rounded-xl border-2 border-dashed bg-background/95 backdrop-blur-sm">
     <UploadCloudIcon class="size-10 text-muted-foreground" />
     <p class="font-medium">
-      {{ uploadStage ? t("clip.uploading", { progress: uploadProgress }) : roomFileDropHandler ? t("rooms.dropToRoom") : t("clip.dropToShare") }}
+      {{ roomFileDropHandler ? t("rooms.dropToRoom") : t("clip.dropToShare") }}
     </p>
-    <p v-if="!uploadStage" class="text-sm text-muted-foreground">{{ t("clip.dropRelease") }}</p>
+    <p v-if="!roomFileDropHandler" class="text-sm text-muted-foreground">{{ t("clip.dropRelease") }}</p>
   </div>
 
   <header class="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
@@ -52,6 +52,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { toast } from "vue-sonner";
 import { MonitorIcon, Moon, Sun, UploadCloudIcon } from "@lucide/vue";
@@ -64,12 +65,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import FileDetailModal from "@/components/FileDetailModal.vue";
-import { roomFileCodeHandler, roomFileDropHandler } from "@/composables/fileDropTarget";
-import { useFileUpload } from "@/composables/useFileUpload";
+import { pendingShareFile, roomFileCodeHandler, roomFileDropHandler } from "@/composables/fileDropTarget";
 import { showDesktopMainWindow, listenForFloatingUploads, type FloatingUploadPayload } from "@/lib/desktop";
 import type { ClipRecord } from "@/types";
 
 const { locale, t } = useI18n();
+const router = useRouter();
 type ThemePreference = "light" | "dark" | "system";
 
 const themePreference = ref<ThemePreference>("system");
@@ -78,7 +79,6 @@ const resolvedTheme = computed<"light" | "dark">(() => themePreference.value ===
 const draggingFile = ref(false);
 const dropResultOpen = ref(false);
 const dropResult = ref<ClipRecord | null>(null);
-const { uploadStage, uploadProgress, uploadFile, resetUploadProgress } = useFileUpload();
 let dragDepth = 0;
 let stopFloatingUploadListener: (() => void) | undefined;
 let colorSchemeQuery: MediaQueryList | null = null;
@@ -141,27 +141,9 @@ const handleDrop = async (event: DragEvent) => {
     await roomFileDropHandler.value(file);
     return;
   }
-  try {
-    const count = 1000;
-    const expire = 86400;
-    const result = await uploadFile(file, { count, expire });
-    const item: ClipRecord = {
-      code: result.code,
-      type: "file",
-      filename: file.name,
-      size: file.size,
-      expiresAt: new Date(Date.now() + expire * 1000).toISOString(),
-      remainingCount: count,
-      maxCount: count,
-    };
-    const history = JSON.parse(localStorage.getItem("clipHistory") || "[]") as ClipRecord[];
-    localStorage.setItem("clipHistory", JSON.stringify([item, ...history.filter((entry) => entry.code !== item.code)].slice(0, 20)));
-    dropResult.value = item;
-    dropResultOpen.value = true;
-  } catch (error) {
-    toast.error(error instanceof Error ? error.message : t("common.unexpectedError"));
-  } finally {
-    resetUploadProgress();
+  pendingShareFile.value = file;
+  if (router.currentRoute.value.name !== "create") {
+    await router.push({ name: "create", query: { tab: "file" } });
   }
 };
 
