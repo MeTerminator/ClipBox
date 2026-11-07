@@ -127,5 +127,5 @@ func (RoomFileRetention) TableName() string { return "cb_room_file_retentions" }
 
 // Expired reports whether the clip is unusable at now due to its lifetime.
 func (clip Clip) Expired(now time.Time) bool {
-	return clip.CreatedAt.IsZero() || now.After(clip.CreatedAt.Add(time.Duration(clip.ExpireSeconds)*time.Second))
+	return clip.CreatedAt.IsZero() || !now.Before(clip.CreatedAt.Add(time.Duration(clip.ExpireSeconds)*time.Second))
 }

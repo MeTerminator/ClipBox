@@ -17,9 +17,8 @@ var (
 type Store interface {
 	Create(context.Context, *model.Clip) error
 	FindByCode(context.Context, string) (*model.Clip, error)
-	ConsumeByCode(context.Context, string, time.Time) (*model.Clip, error)
+	ConsumeAccess(ctx context.Context, clipID int64, now time.Time) (remaining int, err error)
 	FindText(context.Context, string, time.Time) (*model.Clip, error)
-	FindFile(context.Context, string, string, time.Time) (*model.Clip, error)
 	FindReusableFile(context.Context, string, int64, time.Time) (*model.Clip, error)
 	CleanupExpired(context.Context, time.Time) ([]string, int64, error)
 	CountFileReferences(context.Context, string, time.Time) (int, error)

@@ -41,7 +41,7 @@ model <── store / share / server
 
 ### 内容取件
 
-创建文本或链接时，HTTP 层完成协议解码和基础格式检查，仓储在唯一索引冲突时返回 `store.ErrConflict`，服务端重新生成五位码。取件分为两类：`info` 只读元数据；`resolve` 和旧版重定向接口通过 `ConsumeByCode` 在事务中扣减一次访问次数。
+创建文本或链接时，HTTP 层完成协议解码和基础格式检查，仓储在唯一索引冲突时返回 `store.ErrConflict`，服务端重新生成五位码。`info` 只读元数据。文本和链接在解析或重定向时计次，文件在请求下载 URL 时计次。下载 URL 绑定单条取件记录，仓储通过 `ConsumeAccess` 在同一事务中检查有效期并扣减次数。
 
 ### 文件上传
 

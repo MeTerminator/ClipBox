@@ -279,10 +279,12 @@ func (s *GORMStore) Create(ctx context.Context, clip *model.Clip) error {
 	return err
 }
 
-func (s *GORMStore) ConsumeByCode(ctx context.Context, code string, now time.Time) (*model.Clip, error) {
+// ConsumeAccess checks the clip's lifetime and decrements its quota atomically.
+func (s *GORMStore) ConsumeAccess(ctx context.Context, clipID int64, now time.Time) (int, error) {
 	var clip model.Clip
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Preload("File").Where("code = ?", code).First(&clip).Error; err != nil {
+		if err := tx.Select("id", "created_at", "expire_seconds", "access_count").
+			Clauses(clause.Locking{Strength: "UPDATE"}).First(&clip, "id = ?", clipID).Error; err != nil {
 			return err
 		}
 		if clip.Expired(now) || clip.AccessCount <= 0 {
@@ -294,13 +296,12 @@ func (s *GORMStore) ConsumeByCode(ctx context.Context, code string, now time.Tim
 			return err
 		}
 		clip.AccessCount--
-		clip.UpdatedAt = now
 		return nil
 	})
 	if err != nil {
-		return nil, normalizeNotFound(err)
+		return 0, normalizeNotFound(err)
 	}
-	return &clip, nil
+	return clip.AccessCount, nil
 }
 
 func (s *GORMStore) FindByCode(ctx context.Context, code string) (*model.Clip, error) {
@@ -315,13 +316,6 @@ func (s *GORMStore) FindText(ctx context.Context, hash string, now time.Time) (*
 	return s.findActive(s.db.WithContext(ctx).
 		Where("content_type = ? AND content_hash = ?", model.ContentText, hash).
 		Order("created_at DESC").Limit(20), now)
-}
-
-func (s *GORMStore) FindFile(ctx context.Context, hash, filename string, now time.Time) (*model.Clip, error) {
-	return s.findActive(s.db.WithContext(ctx).
-		Joins("JOIN cb_files ON cb_files.id = cb_clips.file_id").
-		Where("cb_clips.content_type = ? AND cb_files.sha1 = ? AND cb_files.filename = ?", model.ContentFile, hash, filename).
-		Order("cb_clips.created_at DESC").Limit(20), now)
 }
 
 func (s *GORMStore) backfillSharedCodes(ctx context.Context) error {

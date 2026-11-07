@@ -26,13 +26,16 @@ import (
 )
 
 type memoryStore struct {
-	clips map[string]*model.Clip
+	clips  map[string]*model.Clip
+	lastID int64
 }
 
 func (m *memoryStore) Create(_ context.Context, clip *model.Clip) error {
 	if _, exists := m.clips[clip.Code]; exists {
 		return store.ErrConflict
 	}
+	m.lastID++
+	clip.ID = m.lastID
 	copy := *clip
 	if copy.CreatedAt.IsZero() {
 		copy.CreatedAt = time.Now().UTC()
@@ -42,14 +45,14 @@ func (m *memoryStore) Create(_ context.Context, clip *model.Clip) error {
 	return nil
 }
 
-func (m *memoryStore) ConsumeByCode(_ context.Context, code string, now time.Time) (*model.Clip, error) {
-	clip := m.clips[code]
-	if clip == nil || clip.Expired(now) || clip.AccessCount <= 0 {
-		return nil, store.ErrNotFound
+func (m *memoryStore) ConsumeAccess(_ context.Context, clipID int64, now time.Time) (int, error) {
+	for _, clip := range m.clips {
+		if clip.ID == clipID && !clip.Expired(now) && clip.AccessCount > 0 {
+			clip.AccessCount--
+			return clip.AccessCount, nil
+		}
 	}
-	clip.AccessCount--
-	copy := *clip
-	return &copy, nil
+	return 0, store.ErrNotFound
 }
 
 func (m *memoryStore) FindByCode(_ context.Context, code string) (*model.Clip, error) {
@@ -64,16 +67,6 @@ func (m *memoryStore) FindByCode(_ context.Context, code string) (*model.Clip, e
 func (m *memoryStore) FindText(_ context.Context, hash string, now time.Time) (*model.Clip, error) {
 	for _, clip := range m.clips {
 		if clip.ContentType == model.ContentText && clip.ContentHash == hash && !clip.Expired(now) {
-			copy := *clip
-			return &copy, nil
-		}
-	}
-	return nil, store.ErrNotFound
-}
-
-func (m *memoryStore) FindFile(_ context.Context, hash, filename string, now time.Time) (*model.Clip, error) {
-	for _, clip := range m.clips {
-		if clip.ContentType == model.ContentFile && clip.File != nil && clip.File.SHA1 == hash && clip.File.Filename == filename && !clip.Expired(now) {
 			copy := *clip
 			return &copy, nil
 		}
@@ -167,7 +160,7 @@ func TestEmbeddedFrontendIsServedFromBinary(t *testing.T) {
 	}
 }
 
-func TestPickupRedirectsToStableSHA1Routes(t *testing.T) {
+func TestPickupRedirectsToDownloadAndContentRoutes(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	dataDir := t.TempDir()
 	payload := []byte("download body")
@@ -182,17 +175,17 @@ func TestPickupRedirectsToStableSHA1Routes(t *testing.T) {
 	textHash := sha1String(text)
 	database := &memoryStore{clips: map[string]*model.Clip{
 		"12345": {
-			Code: "12345", ContentType: model.ContentFile,
+			ID: 1, Code: "12345", ContentType: model.ContentFile,
 			File:          &model.File{Filename: "原始 文件.txt", Path: filePath, SHA1: fileHash, Size: int64(len(payload)), MIMEType: "text/plain"},
-			AccessCount:   2,
+			AccessCount:   1,
 			ExpireSeconds: 3600, CreatedAt: now,
 		},
 		"23456": {
-			Code: "23456", ContentType: model.ContentText, Content: text, ContentHash: textHash,
+			ID: 2, Code: "23456", ContentType: model.ContentText, Content: text, ContentHash: textHash,
 			AccessCount: 2, ExpireSeconds: 3600, CreatedAt: now,
 		},
 		"34567": {
-			Code: "34567", ContentType: model.ContentLink, Content: "https://example.com/original",
+			ID: 3, Code: "34567", ContentType: model.ContentLink, Content: "https://example.com/original",
 			AccessCount: 2, ExpireSeconds: 3600, CreatedAt: now,
 		},
 	}}
@@ -219,6 +212,15 @@ func TestPickupRedirectsToStableSHA1Routes(t *testing.T) {
 	if disposition := fileResponse.Header().Get("Content-Disposition"); !strings.HasPrefix(disposition, "attachment;") {
 		t.Fatalf("content disposition = %q", disposition)
 	}
+	if fileResponse.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("download must not be cached: %v", fileResponse.Header())
+	}
+	for _, path := range []string{location, "/api/clip/12345"} {
+		response := performRequest(application.Handler(), http.MethodGet, path, nil)
+		if response.Code != http.StatusNotFound {
+			t.Fatalf("exhausted %s status = %d, want 404", path, response.Code)
+		}
+	}
 
 	textPickup := performRequest(application.Handler(), http.MethodGet, "/api/clip/23456", nil)
 	if textPickup.Code != http.StatusFound || textPickup.Header().Get("Location") != "/api/text/"+textHash {
@@ -235,21 +237,21 @@ func TestPickupRedirectsToStableSHA1Routes(t *testing.T) {
 	}
 }
 
-func TestClipResolveReturnsStructuredContentAndConsumesOnce(t *testing.T) {
+func TestClipResolveReturnsStructuredContentAndDefersFileAccess(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	now := time.Date(2026, time.August, 15, 12, 0, 0, 0, time.UTC)
 	fileHash := strings.Repeat("a", 40)
 	database := &memoryStore{clips: map[string]*model.Clip{
 		"12345": {
-			Code: "12345", ContentType: model.ContentText, Content: "hello",
+			ID: 1, Code: "12345", ContentType: model.ContentText, Content: "hello",
 			AccessCount: 3, MaxCount: 3, ExpireSeconds: 3600, CreatedAt: now,
 		},
 		"23456": {
-			Code: "23456", ContentType: model.ContentLink, Content: "https://example.com/path",
+			ID: 2, Code: "23456", ContentType: model.ContentLink, Content: "https://example.com/path",
 			AccessCount: 2, MaxCount: 2, ExpireSeconds: 7200, CreatedAt: now,
 		},
 		"34567": {
-			Code: "34567", ContentType: model.ContentFile,
+			ID: 3, Code: "34567", ContentType: model.ContentFile,
 			File:        &model.File{Filename: "report.pdf", SHA1: fileHash, Size: 42},
 			AccessCount: 1, MaxCount: 1, ExpireSeconds: 1800, CreatedAt: now,
 		},
@@ -289,7 +291,7 @@ func TestClipResolveReturnsStructuredContentAndConsumesOnce(t *testing.T) {
 	}{
 		{"12345", model.ContentText, 2, "hello", "", "", now.Add(time.Hour)},
 		{"23456", model.ContentLink, 1, "https://example.com/path", "", "", now.Add(2 * time.Hour)},
-		{"34567", model.ContentFile, 0, "", "report.pdf", "/api/file/" + fileHash + "/report.pdf", now.Add(30 * time.Minute)},
+		{"34567", model.ContentFile, 1, "", "report.pdf", "/api/file/" + fileHash + "/report.pdf?code=34567&id=3", now.Add(30 * time.Minute)},
 	}
 	for _, test := range tests {
 		response := performRequest(application.Handler(), http.MethodPost, "/api/clip/"+test.code+"/resolve", nil)
@@ -312,14 +314,102 @@ func TestClipResolveReturnsStructuredContentAndConsumesOnce(t *testing.T) {
 			t.Fatalf("unexpected info response for %s: %#v", test.code, body)
 		}
 	}
+}
 
-	exhaustedInfo := performRequest(application.Handler(), http.MethodGet, "/api/clip/34567/info", nil)
-	if exhaustedInfo.Code != http.StatusOK || !strings.Contains(exhaustedInfo.Body.String(), `"remaining_count":0`) {
-		t.Fatalf("exhausted info status = %d, body = %s", exhaustedInfo.Code, exhaustedInfo.Body.String())
+func TestFileURLsShareQuotaWithPickupCodes(t *testing.T) {
+	ctx := context.Background()
+	dataDir := t.TempDir()
+	database, err := store.Open(ctx, "sqlite", filepath.Join(dataDir, "test.db"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	exhausted := performRequest(application.Handler(), http.MethodPost, "/api/clip/34567/resolve", nil)
+	defer database.Close()
+	now := time.Now().UTC().Truncate(time.Second)
+	application := New(config.Config{DataDir: dataDir, WWWRoot: dataDir}, database, nil)
+	application.now = func() time.Time { return now }
+	handler := application.Handler()
+	payload := "shared file"
+	hash := sha1String(payload)
+	path := filepath.Join(dataDir, "shared.txt")
+	if err := os.WriteFile(path, []byte(payload), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	createClip := func(code string, count, expire int) *model.Clip {
+		t.Helper()
+		clip := &model.Clip{
+			Code: code, ContentType: model.ContentFile,
+			File:        &model.File{Filename: "shared.txt", Path: path, SHA1: hash, Size: int64(len(payload))},
+			AccessCount: count, MaxCount: count, ExpireSeconds: expire, CreatedAt: now,
+		}
+		if err := database.Create(ctx, clip); err != nil {
+			t.Fatal(err)
+		}
+		return clip
+	}
+	short := createClip("12345", 1, 60)
+	long := createClip("23456", 2, 3600)
+	if short.File.ID != long.File.ID {
+		t.Fatal("expected the clips to share the same stored file")
+	}
+
+	resolve := performRequest(handler, http.MethodPost, "/api/clip/12345/resolve", nil)
+	var resolved struct {
+		DownloadURL string `json:"download_url"`
+	}
+	if err := json.Unmarshal(resolve.Body.Bytes(), &resolved); err != nil ||
+		resolve.Code != http.StatusOK || resolved.DownloadURL != fileURL(short) {
+		t.Fatalf("resolve status = %d, body = %s, error = %v", resolve.Code, resolve.Body.String(), err)
+	}
+	legacyURL, _, _ := strings.Cut(resolved.DownloadURL, "?")
+	now = now.Add(time.Minute)
+	for _, target := range []string{legacyURL, resolved.DownloadURL, "/api/clip/12345"} {
+		if response := performRequest(handler, http.MethodGet, target, nil); response.Code != http.StatusNotFound {
+			t.Fatalf("GET %s = %d, want 404", target, response.Code)
+		}
+	}
+	if _, expired, err := database.CleanupExpired(ctx, now); err != nil || expired != 1 {
+		t.Fatalf("cleanup expired = %d, error = %v", expired, err)
+	}
+	reusedCode := createClip(short.Code, 1, 3600)
+	if old := performRequest(handler, http.MethodGet, resolved.DownloadURL, nil); old.Code != http.StatusNotFound {
+		t.Fatalf("old link after reusing the code = %d, want 404", old.Code)
+	}
+	if fresh := performRequest(handler, http.MethodGet, fileURL(reusedCode), nil); fresh.Code != http.StatusOK || fresh.Body.String() != payload {
+		t.Fatalf("new link for reused code = %d, body = %q", fresh.Code, fresh.Body.String())
+	}
+
+	const attempts = 8
+	target := fileURL(long)
+	responses := make(chan *httptest.ResponseRecorder, attempts)
+	for range attempts {
+		go func() {
+			responses <- performRequest(handler, http.MethodGet, target, nil)
+		}()
+	}
+	downloads := 0
+	for range attempts {
+		response := <-responses
+		switch response.Code {
+		case http.StatusOK:
+			downloads++
+			if response.Body.String() != payload {
+				t.Fatalf("download body = %q", response.Body.String())
+			}
+		case http.StatusNotFound:
+		default:
+			t.Fatalf("concurrent download status = %d, body = %s", response.Code, response.Body.String())
+		}
+	}
+	if downloads != 2 {
+		t.Fatalf("successful downloads = %d, want 2", downloads)
+	}
+	info := performRequest(handler, http.MethodGet, "/api/clip/23456/info", nil)
+	if info.Code != http.StatusOK || !strings.Contains(info.Body.String(), `"remaining_count":0`) {
+		t.Fatalf("exhausted info status = %d, body = %s", info.Code, info.Body.String())
+	}
+	exhausted := performRequest(handler, http.MethodPost, "/api/clip/23456/resolve", nil)
 	if exhausted.Code != http.StatusNotFound {
-		t.Fatalf("exhausted code status = %d", exhausted.Code)
+		t.Fatalf("exhausted resolve status = %d, want 404", exhausted.Code)
 	}
 }
 
@@ -461,7 +551,7 @@ func TestChunkUploadHTTPFlow(t *testing.T) {
 	if err := json.Unmarshal(completeResponse.Body.Bytes(), &completed); err != nil {
 		t.Fatal(err)
 	}
-	if len(completed.Code) != 5 || completed.URL != "/api/file/"+hash+"/sample.txt" {
+	if len(completed.Code) != 5 || completed.URL != "/api/file/"+hash+"/sample.txt?code="+completed.Code+"&id=1" {
 		t.Fatalf("unexpected complete response: %#v", completed)
 	}
 	pickup := performRequest(application.Handler(), http.MethodGet, "/api/clip/"+completed.Code, nil)
@@ -490,6 +580,7 @@ func TestChunkUploadHTTPFlow(t *testing.T) {
 	var repeated struct {
 		Code          string `json:"code"`
 		InstantUpload bool   `json:"instant_upload"`
+		URL           string `json:"url"`
 	}
 	if err := json.Unmarshal(repeatedResponse.Body.Bytes(), &repeated); err != nil {
 		t.Fatal(err)
@@ -499,6 +590,10 @@ func TestChunkUploadHTTPFlow(t *testing.T) {
 	}
 	if reused := database.clips[repeated.Code]; reused == nil || reused.File == nil || reused.File.Path != storedPath {
 		t.Fatalf("repeated upload path = %#v; want %q", reused, storedPath)
+	}
+	direct := performRequest(application.Handler(), http.MethodGet, repeated.URL, nil)
+	if direct.Code != http.StatusOK || !bytes.Equal(direct.Body.Bytes(), payload) || database.clips[repeated.Code].AccessCount != 1 {
+		t.Fatalf("instant-upload URL status = %d, body = %q, remaining = %d", direct.Code, direct.Body.Bytes(), database.clips[repeated.Code].AccessCount)
 	}
 	entries, err := os.ReadDir(filepath.Join(dataDir, "files"))
 	if err != nil || len(entries) != 1 {

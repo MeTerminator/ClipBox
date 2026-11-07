@@ -28,15 +28,19 @@
 
 ### `POST /api/clip/:code/resolve`
 
-扣减一次取件次数并返回结构化内容。文本和链接包含 `content`；文件包含 `filename`、`size` 和 `download_url`。
+返回结构化内容。文本和链接扣减一次取件次数并返回 `content`。文件返回 `filename`、`size` 和 `download_url`，在请求下载时扣减次数。
 
 ### `GET /api/clip/:code`
 
-兼容接口。扣减一次次数后，链接跳转到目标地址，文本跳转到 `/api/text/:sha1`，文件跳转到 `/api/file/:sha1/:filename`。
+链接和文本扣减一次次数后，分别跳转到目标地址和 `/api/text/:sha1`。文件跳转到对应取件记录的下载 URL，由下载接口扣减次数。
 
-### `GET /api/text/:sha1` 与 `GET /api/file/:sha1/:filename`
+### `GET /api/text/:sha1`
 
-读取仍被有效 Clip 引用的内容。文件响应包含安全的 `Content-Disposition` 和 `X-Content-Type-Options: nosniff`。
+读取仍被有效 Clip 引用的文本。
+
+### `GET /api/file/:sha1/:filename?code=:code&id=:id`
+
+使用上传响应或取件接口返回的完整 URL 下载。每次通过校验并打开文件的 GET 请求扣减对应取件码一次，分段下载的每个请求单独计次。取件码到期、次数用完或 URL 缺少取件记录参数时返回 `404`。文件响应包含 `Cache-Control: no-store`、`Content-Disposition` 和 `X-Content-Type-Options: nosniff`。
 
 ## 分片上传
 

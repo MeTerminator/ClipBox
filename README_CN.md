@@ -6,11 +6,11 @@
 [![Gin](https://img.shields.io/badge/Gin-1.10-008ECF.svg)](https://gin-gonic.com/)
 [![GitHub license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-ClipBox 是一个轻量的临时文件、文本和链接分享服务。用户通过五位取件码获取内容，同时文件和文本拥有基于 SHA1 的稳定直达路径。
+ClipBox 是一个轻量的临时文件、文本和链接分享服务。用户通过五位取件码获取内容。
 
 ## 功能
 
-- 文件取件码会重定向到 `/api/file/<文件sha1>/<原始文件名>`，该路径也可以直接下载。
+- 文件取件码会重定向到直链。每次下载消耗该取件码一次，取件码到期或次数用完后直链失效。
 - 文本取件码会重定向到 `/api/text/<文本sha1>`。
 - 链接保持原有行为，取件码直接跳转到目标 URL。
 - 文件使用多路并发分片上传；未完成分片保存在 `data/tmp/<sha1>`，10 分钟内可恢复进度。

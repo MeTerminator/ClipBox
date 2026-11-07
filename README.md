@@ -6,11 +6,11 @@
 [![Gin](https://img.shields.io/badge/Gin-1.10-008ECF.svg)](https://gin-gonic.com/)
 [![GitHub license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-ClipBox is a small temporary sharing service for files, text, and links. A five-digit pickup code resolves to the content while stable SHA1 paths make files and text directly addressable.
+ClipBox is a small temporary sharing service for files, text, and links. A five-digit pickup code resolves to the content.
 
 ## Features
 
-- File pickup codes redirect to `/api/file/<file-sha1>/<original-filename>`; that path is also directly downloadable.
+- File pickup codes redirect to a direct download URL tied to that pickup code's expiration and remaining uses. Each download request uses one access.
 - Text pickup codes redirect to `/api/text/<text-sha1>`.
 - Link pickup codes keep the original behavior and redirect straight to the destination URL.
 - Files are uploaded in parallel chunks. Incomplete chunks are kept under `data/tmp/<sha1>` and can be resumed for 10 minutes.

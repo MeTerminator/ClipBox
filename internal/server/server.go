@@ -214,17 +214,8 @@ func (s *Server) createClip(c *gin.Context) {
 }
 
 func (s *Server) getClip(c *gin.Context) {
-	code := c.Param("code")
-	if len(code) != 5 || !allDigits(code) {
-		jsonError(c, http.StatusNotFound, "Not found")
-		return
-	}
-	clip, err := s.store.ConsumeByCode(c.Request.Context(), code, s.now())
-	if err != nil {
-		if !errors.Is(err, store.ErrNotFound) {
-			slog.Error("consume clip", "code", code, "error", err)
-		}
-		jsonError(c, http.StatusNotFound, "Not found")
+	clip := s.pickupClip(c)
+	if clip == nil {
 		return
 	}
 	switch clip.ContentType {
@@ -237,11 +228,7 @@ func (s *Server) getClip(c *gin.Context) {
 		}
 		c.Redirect(http.StatusFound, "/api/text/"+hash)
 	case model.ContentFile:
-		if clip.File == nil || !upload.ValidSHA1(clip.File.SHA1) || clip.File.Filename == "" {
-			jsonError(c, http.StatusNotFound, "Not found")
-			return
-		}
-		c.Redirect(http.StatusFound, fileURL(clip.File.SHA1, clip.File.Filename))
+		c.Redirect(http.StatusFound, fileURL(clip))
 	default:
 		jsonError(c, http.StatusNotFound, "Not found")
 	}
@@ -277,19 +264,10 @@ func (s *Server) getClipInfo(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// resolveClip consumes one access and returns content for an interactive client.
+// resolveClip returns content or a metered file URL for an interactive client.
 func (s *Server) resolveClip(c *gin.Context) {
-	code := c.Param("code")
-	if len(code) != 5 || !allDigits(code) {
-		jsonError(c, http.StatusNotFound, "Not found")
-		return
-	}
-	clip, err := s.store.ConsumeByCode(c.Request.Context(), code, s.now())
-	if err != nil {
-		if !errors.Is(err, store.ErrNotFound) {
-			slog.Error("resolve clip", "code", code, "error", err)
-		}
-		jsonError(c, http.StatusNotFound, "Not found")
+	clip := s.pickupClip(c)
+	if clip == nil {
 		return
 	}
 	response := gin.H{
@@ -303,18 +281,61 @@ func (s *Server) resolveClip(c *gin.Context) {
 	case model.ContentLink, model.ContentText:
 		response["content"] = clip.Content
 	case model.ContentFile:
-		if clip.File == nil || !upload.ValidSHA1(clip.File.SHA1) || clip.File.Filename == "" {
-			jsonError(c, http.StatusNotFound, "Not found")
-			return
-		}
 		response["filename"] = clip.File.Filename
 		response["size"] = clip.File.Size
-		response["download_url"] = fileURL(clip.File.SHA1, clip.File.Filename)
+		response["download_url"] = fileURL(clip)
 	default:
 		jsonError(c, http.StatusNotFound, "Not found")
 		return
 	}
 	c.JSON(http.StatusOK, response)
+}
+
+func (s *Server) pickupClip(c *gin.Context) *model.Clip {
+	c.Header("Cache-Control", "no-store")
+	clip := s.findAvailableClip(c, c.Param("code"))
+	if clip == nil {
+		return nil
+	}
+	if clip.ContentType == model.ContentFile {
+		// A redirect or metadata response must leave the last access for the download.
+		if clip.File == nil || !upload.ValidSHA1(clip.File.SHA1) || clip.File.Filename == "" {
+			jsonError(c, http.StatusNotFound, "Not found")
+			return nil
+		}
+	} else if !s.consumeClipAccess(c, clip) {
+		return nil
+	}
+	return clip
+}
+
+func (s *Server) findAvailableClip(c *gin.Context, code string) *model.Clip {
+	if len(code) != 5 || !allDigits(code) {
+		jsonError(c, http.StatusNotFound, "Not found")
+		return nil
+	}
+	clip, err := s.store.FindByCode(c.Request.Context(), code)
+	if err != nil || clip.Expired(s.now()) || clip.AccessCount <= 0 {
+		if err != nil && !errors.Is(err, store.ErrNotFound) {
+			slog.Error("find available clip", "code", code, "error", err)
+		}
+		jsonError(c, http.StatusNotFound, "Not found")
+		return nil
+	}
+	return clip
+}
+
+func (s *Server) consumeClipAccess(c *gin.Context, clip *model.Clip) bool {
+	remaining, err := s.store.ConsumeAccess(c.Request.Context(), clip.ID, s.now())
+	if err != nil {
+		if !errors.Is(err, store.ErrNotFound) {
+			slog.Error("consume clip", "code", clip.Code, "error", err)
+		}
+		jsonError(c, http.StatusNotFound, "Not found")
+		return false
+	}
+	clip.AccessCount = remaining
+	return true
 }
 
 func (s *Server) getText(c *gin.Context) {
@@ -332,20 +353,35 @@ func (s *Server) getText(c *gin.Context) {
 }
 
 func (s *Server) getFile(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
 	hash := strings.ToLower(c.Param("sha1"))
 	filename := strings.TrimPrefix(c.Param("filename"), "/")
-	if !upload.ValidSHA1(hash) || filename == "" || filename != filepath.Base(filename) {
+	id := c.Query("id")
+	if !upload.ValidSHA1(hash) || filename == "" || filename != filepath.Base(filename) || id == "" {
 		jsonError(c, http.StatusNotFound, "Not found")
 		return
 	}
-	clip, err := s.store.FindFile(c.Request.Context(), hash, filename, s.now())
-	if err != nil || clip.File == nil || clip.File.Path == "" {
+	clip := s.findAvailableClip(c, c.Query("code"))
+	if clip == nil {
+		return
+	}
+	if id != strconv.FormatInt(clip.ID, 10) || clip.ContentType != model.ContentFile ||
+		clip.File == nil || clip.File.SHA1 != hash || clip.File.Filename != filename || clip.File.Path == "" {
 		jsonError(c, http.StatusNotFound, "Not found")
 		return
 	}
-	info, err := os.Stat(clip.File.Path)
+	file, err := os.Open(clip.File.Path)
+	if err != nil {
+		jsonError(c, http.StatusNotFound, "Not found")
+		return
+	}
+	defer file.Close()
+	info, err := file.Stat()
 	if err != nil || !info.Mode().IsRegular() {
 		jsonError(c, http.StatusNotFound, "Not found")
+		return
+	}
+	if !s.consumeClipAccess(c, clip) {
 		return
 	}
 	contentType := clip.File.MIMEType
@@ -358,7 +394,7 @@ func (s *Server) getFile(c *gin.Context) {
 	c.Header("Content-Type", contentType)
 	c.Header("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": filename}))
 	c.Header("X-Content-Type-Options", "nosniff")
-	c.File(clip.File.Path)
+	http.ServeContent(c.Writer, c.Request, filename, info.ModTime(), file)
 }
 
 func (s *Server) initUpload(c *gin.Context) {
@@ -387,7 +423,7 @@ func (s *Server) initUpload(c *gin.Context) {
 					jsonError(c, http.StatusInternalServerError, "Database error")
 					return
 				}
-				c.JSON(http.StatusOK, gin.H{"instant_upload": true, "code": clip.Code, "url": fileURL(clip.File.SHA1, clip.File.Filename)})
+				c.JSON(http.StatusOK, gin.H{"instant_upload": true, "code": clip.Code, "url": fileURL(clip)})
 				return
 			}
 		}
@@ -402,7 +438,7 @@ func (s *Server) initUpload(c *gin.Context) {
 			jsonError(c, http.StatusInternalServerError, "Database error")
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"instant_upload": true, "code": clip.Code, "url": fileURL(clip.File.SHA1, clip.File.Filename)})
+		c.JSON(http.StatusOK, gin.H{"instant_upload": true, "code": clip.Code, "url": fileURL(clip)})
 		return
 	}
 
@@ -469,7 +505,7 @@ func (s *Server) completeUpload(c *gin.Context) {
 		jsonError(c, http.StatusInternalServerError, "Database error")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"code": clip.Code, "instant_upload": false, "url": fileURL(hash, request.Filename)})
+	c.JSON(http.StatusOK, gin.H{"code": clip.Code, "instant_upload": false, "url": fileURL(clip)})
 }
 
 func (s *Server) cleanupExpired(ctx context.Context, now time.Time) (int64, int, error) {
@@ -761,8 +797,10 @@ func sha1String(value string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func fileURL(hash, filename string) string {
-	return "/api/file/" + hash + "/" + url.PathEscape(filename)
+func fileURL(clip *model.Clip) string {
+	// The ID prevents an old URL from becoming valid if the pickup code is reused.
+	return "/api/file/" + clip.File.SHA1 + "/" + url.PathEscape(clip.File.Filename) +
+		"?code=" + clip.Code + "&id=" + strconv.FormatInt(clip.ID, 10)
 }
 
 func allDigits(value string) bool {

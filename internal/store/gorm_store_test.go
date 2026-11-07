@@ -59,9 +59,9 @@ func TestGORMStorePersistsFilesSeparately(t *testing.T) {
 		t.Fatalf("clip/file counts = %d/%d, want 3/2", clipCount, fileCount)
 	}
 
-	found, err := store.FindFile(context.Background(), hash, "second.txt", now)
+	found, err := store.FindByCode(context.Background(), second.Code)
 	if err != nil || found.File == nil || found.File.Path != path {
-		t.Fatalf("FindFile() = %#v, %v", found, err)
+		t.Fatalf("FindByCode() = %#v, %v", found, err)
 	}
 	reusable, err := store.FindReusableFile(context.Background(), hash, int64(len("shared")), now)
 	if err != nil || reusable.File == nil || reusable.File.SHA1 != hash {
@@ -279,7 +279,7 @@ func TestGORMStoreMigratesLegacyClipFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fileClip, err := store.ConsumeByCode(context.Background(), "12345", now)
+	fileClip, err := store.FindByCode(context.Background(), "12345")
 	if err != nil {
 		t.Fatal(err)
 	}
